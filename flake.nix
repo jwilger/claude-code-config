@@ -11,7 +11,7 @@
       let
         pkgs = import nixpkgs { inherit system; };
         
-        # Language-specific configurations (inline to avoid module complexity)
+        # Language-specific configurations
         languageConfigs = {
           rust = {
             mcpServers = [ "cargo" "git" "github" "sparc-memory" ];
@@ -23,7 +23,6 @@
             checkCommand = "cargo check";
             lintCommand = "cargo clippy";
             formatCommand = "cargo fmt";
-            formatCheckCommand = "cargo fmt --check";
             watchCommand = "cargo watch -x test";
             expandCommand = "cargo expand";
             editCommand = "cargo edit";
@@ -33,52 +32,57 @@
             testFramework = "nextest";
             buildSystem = "Cargo";
             packageManager = "cargo";
-            packageManagerTools = "cargo add, cargo remove";
             configFile = "Cargo.toml";
             toolchain = "stable with clippy, rustfmt, rust-analyzer";
             devTools = "cargo-nextest, cargo-watch, cargo-expand, cargo-edit";
             architecture = "multi-agent orchestration server";
             domainPhilosophy = "type-driven development";
-            typeSystemFeatures = "Phantom types for agent state transitions (`Agent<Unloaded>` → `Agent<Loaded>` → `Agent<Running>`)";
+            typeSystemFeatures = "Phantom types for agent state transitions (Agent<Unloaded> → Agent<Loaded> → Agent<Running>)";
             typeLibrary = "nutype crate";
-            qualityRules = "NEVER ADD ALLOW ATTRIBUTES - treat warnings as errors";
-            qualityFlags = "RUSTFLAGS=\"-D warnings\"";
+            qualityFlags = "RUSTFLAGS=\\\"-D warnings\\\"";
             lintSuppressAttribute = "#[allow(clippy::...)]";
             globalLintSuppressAttribute = "#![allow(clippy::...)]";
             testMcpCommand = "mcp__cargo__cargo_test";
             lintMcpCommand = "mcp__cargo__cargo_clippy";
             formatCheckMcpCommand = "mcp__cargo__cargo_fmt_check";
           };
+          
           typescript = {
             mcpServers = [ "nodejs" "git" "github" "sparc-memory" ];
-            testCommand = "npm test";
-            lintCommand = "npm run lint || echo 'No lint script'";
-            formatCommand = "npm run format || echo 'No format script'";
+            testRunner = "npm test";
+            testCommandFallback = "npm test";
+            testBacktraceEnv = "NODE_OPTIONS";
+            buildCommand = "npm run build";
+            buildRelease = "npm run build";
+            checkCommand = "npm run typecheck";
+            lintCommand = "npm run lint";
+            formatCommand = "npm run format";
+            watchCommand = "npm run test:watch";
+            expandCommand = "npm run analyze";
+            editCommand = "npm install";
+            addCommand = "npm install";
+            removeCommand = "npm uninstall";
             mcpTools = [ "mcp__nodejs__run_script" ];
-            testFramework = "Jest/Vitest/npm test scripts";
-            buildSystem = "npm/pnpm/yarn";
-          };
-          python = {
-            mcpServers = [ "git" "github" "sparc-memory" ];
-            testCommand = "pytest";
-            lintCommand = "ruff check .";
-            formatCommand = "ruff format .";
-            mcpTools = [ ];
-            testFramework = "pytest";
-            buildSystem = "pip/poetry/uv";
-          };
-          elixir = {
-            mcpServers = [ "mix" "git" "github" "sparc-memory" ];
-            testCommand = "mix test";
-            lintCommand = "mix credo";
-            formatCommand = "mix format";
-            mcpTools = [ "mcp__mix__test" ];
-            testFramework = "ExUnit";
-            buildSystem = "Mix";
+            testFramework = "Jest/Vitest";
+            buildSystem = "npm";
+            packageManager = "npm";
+            configFile = "package.json";
+            toolchain = "Node.js with TypeScript";
+            devTools = "Jest, ESLint, Prettier, TypeScript";
+            architecture = "web application";
+            domainPhilosophy = "type-driven development";
+            typeSystemFeatures = "TypeScript branded types and discriminated unions";
+            typeLibrary = "TypeScript";
+            qualityFlags = "--strict";
+            lintSuppressAttribute = "// eslint-disable";
+            globalLintSuppressAttribute = "/* eslint-disable */";
+            testMcpCommand = "mcp__nodejs__run_script";
+            lintMcpCommand = "mcp__nodejs__run_script";
+            formatCheckMcpCommand = "mcp__nodejs__run_script";
           };
         };
 
-        # Setup script with proper language-specific configuration
+        # Setup script for each language
         setupClaudeConfig = language: 
           let
             config = languageConfigs.${language};
@@ -104,184 +108,54 @@
             # Create .claude directory structure
             mkdir -p .claude/{agents,commands,hooks}
             
-            # Generate language-specific agents
-            cat > .claude/agents/expert.md << 'EOF'
----
-name: expert
-description: Provide expert review and validation of code quality, architecture decisions, and implementation approaches for ${language} projects.
-tools: Read, Grep, Glob, ${builtins.concatStringsSep ", " (config.mcpTools ++ ["mcp__git__git_status" "mcp__git__git_diff" "mcp__sparc-memory__create_entities" "mcp__sparc-memory__create_relations" "mcp__sparc-memory__add_observations" "mcp__sparc-memory__search_nodes" "mcp__sparc-memory__open_nodes"])}
----
-
-# Expert Agent - ${language}
-
-You are the expert review specialist for ${language} projects using SPARC workflows.
-
-## Language-Specific Focus
-
-- **Build System**: ${config.buildSystem}  
-- **Test Framework**: ${config.testFramework}
-- **Quality Commands**: ${config.lintCommand}, ${config.formatCommand}
-
-## Core Responsibilities
-
-### 1. ${language} Code Quality Review
-- Correctness verification using ${config.testFramework}
-- Performance analysis for ${language} applications  
-- ${language}-specific best practices and idioms
-- Security review for ${language} applications
-
-### 2. Architecture Review
-- Evaluate ${language} project structure and organization
-- Review dependency management via ${config.buildSystem}
-- Assess maintainability and extensibility
-
-Use \`${config.testCommand}\` to run tests and \`${config.lintCommand}\` for quality checks.
-EOF
-
-            # Generate red-implementer agent  
-            cat > .claude/agents/red-implementer.md << 'EOF'
----
-name: red-implementer
-description: Write FAILING tests that capture behavioral intent for ${language} projects.
-tools: Read, Edit, MultiEdit, Write, Grep, Glob, ${builtins.concatStringsSep ", " (config.mcpTools ++ ["mcp__git__git_status" "mcp__git__git_diff" "mcp__sparc-memory__create_entities" "mcp__sparc-memory__create_relations" "mcp__sparc-memory__add_observations" "mcp__sparc-memory__search_nodes" "mcp__sparc-memory__open_nodes"])}
----
-
-# Red Implementer - ${language}
-
-Write failing tests for ${language} using ${config.testFramework}.
-
-## ${language} Testing Approach
-
-- **Framework**: ${config.testFramework}
-- **Run Command**: \`${config.testCommand}\`
-- **Build System**: ${config.buildSystem}
-
-## Failure Verification
-
-Always verify test fails by running: \`${config.testCommand}\`
-EOF
-
-            # Generate green-implementer agent
-            cat > .claude/agents/green-implementer.md << 'EOF'
----
-name: green-implementer  
-description: Implement minimal code to make failing tests pass in ${language}.
-tools: Read, Edit, MultiEdit, Write, Grep, Glob, ${builtins.concatStringsSep ", " (config.mcpTools ++ ["mcp__git__git_status" "mcp__git__git_diff" "mcp__sparc-memory__create_entities" "mcp__sparc-memory__create_relations" "mcp__sparc-memory__add_observations" "mcp__sparc-memory__search_nodes" "mcp__sparc-memory__open_nodes"])}
----
-
-# Green Implementer - ${language}
-
-Implement minimal ${language} code to make tests pass.
-
-## ${language} Implementation
-
-- **Test Command**: \`${config.testCommand}\`
-- **Build System**: ${config.buildSystem}
-- **Quality Check**: \`${config.lintCommand}\`
-
-Apply the simplest solution that makes tests pass.
-EOF
-
-            # Copy language-agnostic templates and generate language-specific content
+            # Copy templates and generate language-specific content
             cp -r ${./templates/claude-templates/commands}/* .claude/commands/ 2>/dev/null || true
             cp -r ${./templates/claude-templates/hooks}/* .claude/hooks/ 2>/dev/null || true
             cp -r ${./templates/claude-templates/agents}/* .claude/agents/ 2>/dev/null || true
             
-            # Generate CLAUDE.md from template
-            cat > CLAUDE.md << 'EOF'
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Development Commands
-
-### Testing
-
-Always use \`${config.testRunner}\` instead of \`${config.testCommandFallback}\`:
-
-\`\`\`bash
-${config.testRunner}                    # Run all tests
-${config.testRunner} --lib             # Unit tests only
-${config.testRunner} --tests           # Integration tests only
-${config.testRunner} --nocapture       # Show test output
-RUST_BACKTRACE=1 ${config.testRunner}  # With backtrace on failure
-\`\`\`
-
-### Building and Linting
-
-\`\`\`bash
-${config.buildCommand}                          # Build the project
-${config.buildRelease}              # Release build
-${config.checkCommand}                         # Fast syntax/type checking
-${config.lintCommand}                        # Linting (strict rules enabled)
-${config.formatCommand}                          # Format code
-\`\`\`
-
-### Development Tools
-
-\`\`\`bash
-${config.watchCommand}                 # Auto-run tests on changes
-${config.expandCommand}                       # Macro expansion
-${config.editCommand}                         # Dependency management
-\`\`\`
-
-## Architecture Overview
-
-This is a **${config.architecture}** that provides WebAssembly-based agent isolation, FIPA-compliant messaging, and comprehensive observability. It runs as a standalone server process (like PostgreSQL or Redis) rather than a library.
-
-### Core Components
-
-- **Agent Runtime Environment**: Manages WebAssembly agent lifecycle with sandboxing and resource limits
-- **FIPA Message Router**: High-performance async message routing between agents with conversation tracking
-- **Security & Sandboxing**: WebAssembly isolation with CPU/memory limits and host function restrictions
-- **Observability Layer**: Built-in structured logging, metrics (Prometheus), and distributed tracing (OpenTelemetry)
-- **Agent Lifecycle Management**: Deployment strategies including blue-green, canary, and shadow deployments
-
-### Domain Model Philosophy
-
-The codebase follows **${config.domainPhilosophy}** principles:
-
-- Illegal states are unrepresentable through the type system
-- ${config.typeSystemFeatures}
-- Smart constructors with validation (e.g., \`AgentId\`, \`Percentage\`)
-- Comprehensive error types with domain-specific variants
-- nutype crate for eliminating primitive obsession
-
-### Key Domain Types
-
-Located in \`src/domain_types.rs\` and \`src/domain/\`:
-
-- **Agent Identity**: \`AgentId\`, \`AgentName\` with validation
-- **Resources**: \`CpuFuel\`, \`MemoryBytes\`, \`MaxAgentMemory\` with limits
-- **Messaging**: \`MessageId\`, \`ConversationId\`, \`Performative\` for FIPA compliance
-- **Deployment**: \`DeploymentId\`, \`DeploymentStrategy\`, \`DeploymentStatus\` for lifecycle management
-- **Security**: \`WasmSecurityPolicy\`, \`ResourceLimits\`, \`ValidationRule\` for sandboxing
-
-[... rest of Caxton's comprehensive CLAUDE.md content ...]
-
-## Code Quality Enforcement - CRITICAL
-
-**${config.qualityRules}** - This is a hard rule with zero exceptions without team approval.
-
-- **NEVER** use \`#![allow(clippy::...)]\` or \`#[allow(clippy::...)]\` without explicit team approval
-- **NEVER** bypass pre-commit hooks or ignore clippy warnings/errors  
-- **ALWAYS** fix the underlying issue causing the warning instead of suppressing it
-- Pre-commit hooks MUST pass with \`-D warnings\` (treat warnings as errors)
-
-EOF
+            # Generate CLAUDE.md from template with substitutions
+            sed -e "s/{{testRunner}}/${config.testRunner}/g" \
+                -e "s/{{testCommandFallback}}/${config.testCommandFallback}/g" \
+                -e "s/{{testBacktraceEnv}}/${config.testBacktraceEnv}/g" \
+                -e "s/{{buildCommand}}/${config.buildCommand}/g" \
+                -e "s|{{buildRelease}}|${config.buildRelease}|g" \
+                -e "s/{{checkCommand}}/${config.checkCommand}/g" \
+                -e "s/{{lintCommand}}/${config.lintCommand}/g" \
+                -e "s/{{formatCommand}}/${config.formatCommand}/g" \
+                -e "s|{{watchCommand}}|${config.watchCommand}|g" \
+                -e "s/{{expandCommand}}/${config.expandCommand}/g" \
+                -e "s/{{editCommand}}/${config.editCommand}/g" \
+                -e "s/{{addCommand}}/${config.addCommand}/g" \
+                -e "s/{{removeCommand}}/${config.removeCommand}/g" \
+                -e "s/{{architecture}}/${config.architecture}/g" \
+                -e "s/{{domainPhilosophy}}/${config.domainPhilosophy}/g" \
+                -e "s|{{typeSystemFeatures}}|${config.typeSystemFeatures}|g" \
+                -e "s/{{typeLibrary}}/${config.typeLibrary}/g" \
+                -e "s/{{buildSystem}}/${config.buildSystem}/g" \
+                -e "s/{{packageManager}}/${config.packageManager}/g" \
+                -e "s/{{configFile}}/${config.configFile}/g" \
+                -e "s|{{toolchain}}|${config.toolchain}|g" \
+                -e "s|{{devTools}}|${config.devTools}|g" \
+                -e "s/{{testFramework}}/${config.testFramework}/g" \
+                -e "s|{{qualityFlags}}|${config.qualityFlags}|g" \
+                -e "s|{{lintSuppressAttribute}}|${config.lintSuppressAttribute}|g" \
+                -e "s|{{globalLintSuppressAttribute}}|${config.globalLintSuppressAttribute}|g" \
+                -e "s/{{testMcpCommand}}/${config.testMcpCommand}/g" \
+                -e "s/{{lintMcpCommand}}/${config.lintMcpCommand}/g" \
+                -e "s/{{formatCheckMcpCommand}}/${config.formatCheckMcpCommand}/g" \
+                ${./templates/CLAUDE.md.template} > CLAUDE.md
 
             # Create language-specific MCP settings
             cat > .claude/settings.json << 'EOF'
-${mcpServersJson}
-EOF
+${mcpServersJson}EOF
             
             echo "✅ Claude Code configuration complete with ${language}-specific setup!"
             echo "📁 Created:"
-            echo "  CLAUDE.md (${language}-specific commands)"
+            echo "  CLAUDE.md (${language}-specific)"
             echo "  .claude/settings.json (${builtins.toString (builtins.length config.mcpServers)} MCP servers)"
-            echo "  .claude/agents/ (SPARC workflow agents)"
-            echo "  .claude/commands/ (custom slash commands)"  
-            echo "  .claude/hooks/ (quality enforcement hooks)"
+            echo "  .claude/agents/ (SPARC workflow)"
+            echo "  .claude/commands/ (custom commands)"
+            echo "  .claude/hooks/ (quality enforcement)"
           '';
         
       in {
@@ -303,26 +177,6 @@ EOF
               echo "⚡ TypeScript project with Claude Code"
               if [ ! -d ".claude" ]; then
                 ${setupClaudeConfig "typescript"}
-              fi
-            '';
-          };
-
-          python = pkgs.mkShell {
-            buildInputs = with pkgs; [ git gh nodejs python3 ];
-            shellHook = ''
-              echo "🐍 Python project with Claude Code"
-              if [ ! -d ".claude" ]; then
-                ${setupClaudeConfig "python"}
-              fi
-            '';
-          };
-
-          elixir = pkgs.mkShell {
-            buildInputs = with pkgs; [ git gh nodejs python3 ];
-            shellHook = ''
-              echo "💜 Elixir project with Claude Code"
-              if [ ! -d ".claude" ]; then
-                ${setupClaudeConfig "elixir"}
               fi
             '';
           };
