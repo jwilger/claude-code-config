@@ -1,0 +1,88 @@
+## Architecture Overview
+
+Caxton is a **multi-agent orchestration server** that provides WebAssembly-based agent isolation, FIPA-compliant messaging, and comprehensive observability. It runs as a standalone server process (like PostgreSQL or Redis) rather than a library.
+
+### Core Components
+
+- **Agent Runtime Environment**: Manages WebAssembly agent lifecycle with sandboxing and resource limits
+- **FIPA Message Router**: High-performance async message routing between agents with conversation tracking
+- **Security & Sandboxing**: WebAssembly isolation with CPU/memory limits and host function restrictions
+- **Observability Layer**: Built-in structured logging, metrics (Prometheus), and distributed tracing (OpenTelemetry)
+- **Agent Lifecycle Management**: Deployment strategies including blue-green, canary, and shadow deployments
+
+### Domain Model Philosophy
+
+The codebase follows **type-driven development** principles:
+
+- Illegal states are unrepresentable through the type system
+- Phantom types for agent state transitions (`Agent<Unloaded>` → `Agent<Loaded>` → `Agent<Running>`)
+- Smart constructors with validation (e.g., `AgentId`, `Percentage`)
+- Comprehensive error types with domain-specific variants
+- nutype crate for eliminating primitive obsession
+
+### Key Domain Types
+
+Located in `src/domain_types.rs` and `src/domain/`:
+
+- **Agent Identity**: `AgentId`, `AgentName` with validation
+- **Resources**: `CpuFuel`, `MemoryBytes`, `MaxAgentMemory` with limits
+- **Messaging**: `MessageId`, `ConversationId`, `Performative` for FIPA compliance
+- **Deployment**: `DeploymentId`, `DeploymentStrategy`, `DeploymentStatus` for lifecycle management
+- **Security**: `WasmSecurityPolicy`, `ResourceLimits`, `ValidationRule` for sandboxing
+
+## Code Structure
+
+### Core Modules
+
+- `src/sandbox.rs` - WebAssembly agent sandboxing with resource limits
+- `src/security.rs` - Security policies and validation
+- `src/resource_manager.rs` - CPU/memory resource management
+- `src/message_router/` - FIPA message routing with conversation management
+- `src/runtime/` - Agent runtime environment
+- `src/host_functions.rs` - Safe host function registry
+
+### Agent Lifecycle Management
+
+- `src/agent_lifecycle_manager.rs` - Orchestrates agent operations
+- `src/deployment_manager.rs` - Handles deployment strategies
+- `src/hot_reload_manager.rs` - Zero-downtime agent updates
+- `src/wasm_module_validator.rs` - Validates WASM modules before deployment
+
+### Domain Layer
+
+- `src/domain/` - Rich domain types with business logic
+- `src/domain_types.rs` - Primitive obsession elimination with nutype
+
+### Test Structure
+
+- **Unit tests**: In `#[cfg(test)]` modules within source files
+- **Integration tests**: In `tests/` directory
+- **Fixtures**: WASM test modules in `tests/fixtures/`
+- **Property-based testing**: Using proptest for validation logic
+
+## Testing Patterns
+
+The project uses comprehensive testing with nextest for better performance:
+
+- **47 total tests** (37 unit + 10 integration)
+- Property-based testing for domain validation
+- WASM fixture generation for integration tests
+- Resource limit testing with controlled memory/CPU consumption
+
+## Key Architectural Decisions
+
+Reference the ADR documentation in `docs/adr/` for detailed rationales:
+
+1. **Observability First** (ADR-0001): Every operation is instrumented with tracing
+2. **WebAssembly Isolation** (ADR-0002): Agents run in secure WASM sandboxes
+3. **FIPA Messaging** (ADR-0003): Standard agent communication protocols
+4. **Type Safety** (ADR-0018): Domain types with nutype to prevent primitive obsession
+5. **Coordination First** (ADR-0014): Lightweight coordination instead of shared databases
+
+## Project-Specific Development Conventions
+
+- **Error Handling**: Use `CaxtonResult<T>` with comprehensive domain errors
+- **Tracing**: Instrument all async functions with `#[instrument]`
+- **Resource Safety**: Always validate resource limits before allocation
+- **State Machines**: Use phantom types for compile-time state validation
+- **Testing**: Write property-based tests for validation logic

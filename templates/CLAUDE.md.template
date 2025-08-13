@@ -34,168 +34,75 @@ Always use `{{testRunner}}` instead of `{{testCommandFallback}}`:
 {{editCommand}}                         # Dependency management
 ```
 
-## Architecture Overview
-
-{{projectArchitectureDescription}}
-
-### Core Components
-
-- **Agent Runtime Environment**: Manages WebAssembly agent lifecycle with sandboxing and resource limits
-- **FIPA Message Router**: High-performance async message routing between agents with conversation tracking
-- **Security & Sandboxing**: WebAssembly isolation with CPU/memory limits and host function restrictions
-- **Observability Layer**: Built-in structured logging, metrics (Prometheus), and distributed tracing (OpenTelemetry)
-- **Agent Lifecycle Management**: Deployment strategies including blue-green, canary, and shadow deployments
-
-### Domain Model Philosophy
-
-The codebase follows **{{domainPhilosophy}}** principles:
-
-- Illegal states are unrepresentable through the type system
-- {{typeSystemFeatures}}
-- Smart constructors with validation (e.g., `AgentId`, `Percentage`)
-- Comprehensive error types with domain-specific variants
-- {{typeLibrary}} for eliminating primitive obsession
-
-### Key Domain Types
-
-Located in `src/domain_types.rs` and `src/domain/`:
-
-- **Agent Identity**: `AgentId`, `AgentName` with validation
-- **Resources**: `CpuFuel`, `MemoryBytes`, `MaxAgentMemory` with limits
-- **Messaging**: `MessageId`, `ConversationId`, `Performative` for FIPA compliance
-- **Deployment**: `DeploymentId`, `DeploymentStrategy`, `DeploymentStatus` for lifecycle management
-- **Security**: `WasmSecurityPolicy`, `ResourceLimits`, `ValidationRule` for sandboxing
-
-## Code Structure
-
-### Core Modules
-
-- `src/sandbox.rs` - WebAssembly agent sandboxing with resource limits
-- `src/security.rs` - Security policies and validation
-- `src/resource_manager.rs` - CPU/memory resource management
-- `src/message_router/` - FIPA message routing with conversation management
-- `src/runtime/` - Agent runtime environment
-- `src/host_functions.rs` - Safe host function registry
-
-### Agent Lifecycle Management
-
-- `src/agent_lifecycle_manager.rs` - Orchestrates agent operations
-- `src/deployment_manager.rs` - Handles deployment strategies
-- `src/hot_reload_manager.rs` - Zero-downtime agent updates
-- `src/wasm_module_validator.rs` - Validates WASM modules before deployment
-
-### Domain Layer
-
-- `src/domain/` - Rich domain types with business logic
-- `src/domain_types.rs` - Primitive obsession elimination with nutype
-
-### Test Structure
-
-- **Unit tests**: In `#[cfg(test)]` modules within source files
-- **Integration tests**: In `tests/` directory
-- **Fixtures**: WASM test modules in `tests/fixtures/`
-- **Property-based testing**: Using proptest for validation logic
-
-## Testing Patterns
-
-The project uses comprehensive testing with {{testFramework}} for better performance:
-
-- **47 total tests** (37 unit + 10 integration)
-- Property-based testing for domain validation
-- WASM fixture generation for integration tests
-- Resource limit testing with controlled memory/CPU consumption
-
-## Key Architectural Decisions
-
-Reference the ADR documentation in `docs/adr/` for detailed rationales:
-
-1. **Observability First** (ADR-0001): Every operation is instrumented with tracing
-2. **WebAssembly Isolation** (ADR-0002): Agents run in secure WASM sandboxes
-3. **FIPA Messaging** (ADR-0003): Standard agent communication protocols
-4. **Type Safety** (ADR-0018): Domain types with nutype to prevent primitive obsession
-5. **Coordination First** (ADR-0014): Lightweight coordination instead of shared databases
+<!-- Project-specific architecture, components, and code structure belong in CLAUDE.local.md -->
 
 ## Development Conventions
 
-- **Error Handling**: Use `CaxtonResult<T>` with comprehensive domain errors
-- **Tracing**: Instrument all async functions with `#[instrument]`
-- **Resource Safety**: Always validate resource limits before allocation
-- **State Machines**: Use phantom types for compile-time state validation
-- **Testing**: Write property-based tests for validation logic
+**Universal Conventions:**
 - **Dependency Management**: Always use package manager CLI tools (`{{addCommand}}`, `{{removeCommand}}`) to install/update dependencies. Never manually edit {{configFile}} version numbers. This ensures we use the latest compatible versions and avoid version conflicts.
+
+{{languageDevelopmentConventionsContent}}
 
 ## External Dependencies
 
 The project uses Nix for development environment management:
 
-- {{languageName}} toolchain: {{toolchain}}
-- Development tools: {{devTools}}
-- Optional: just for task automation
-- Ad-hoc: use `nix shell` to use a tool that is not currently installed.
+- Ad-hoc tools: use `nix shell` to use a tool that is not currently installed
 - Update Flake: For tools you regularly use, consider adding them to the flake.nix file
 
-## {{languageName}} Type-Driven Rules
+{{languageDependencyContent}}
 
-- **Illegal states are unrepresentable**: prefer domain types over primitives.
-- All new domain types use `nutype` with `sanitize(...)` and `validate(...)`. Derive at least: `Clone, Debug, Eq, PartialEq, Display`; add `Serialize, Deserialize` where needed.
-- Prefer `Result<T, DomainError>` over panics. Panics only for truly unreachable states.
+## Type-Driven Development Rules
 
-### Example
+**Universal Principles:**
+- **Illegal states are unrepresentable**: prefer domain types over primitives
+- Use smart constructors with validation rather than exposing raw data
+- Prefer explicit error types over exceptions/panics for recoverable errors
+- Make invalid states impossible through the type system
 
-```rust
-#[nutype(
-  sanitize(trim),
-  validate(len(min = 1, max = 64)),
-  derive(Clone, Debug, Eq, PartialEq, Display)
-)]
-pub struct AgentName(String);
-```
+{{languageTypeSystemContent}}
 
 ## Code Quality Enforcement - CRITICAL
 
-**NEVER ADD ALLOW ATTRIBUTES** - This is a hard rule with zero exceptions without team approval.
+**NEVER BYPASS LINTERS WITH INLINE OVERRIDES** - This is a hard rule with zero exceptions without team approval.
 
-- **NEVER** use `{{globalLintSuppressAttribute}}` or `{{lintSuppressAttribute}}` without explicit team approval
-- **NEVER** bypass pre-commit hooks or ignore clippy warnings/errors
+**Universal Rules:**
+- **NEVER** bypass linters or ignore warnings/errors with inline directives
 - **ALWAYS** fix the underlying issue causing the warning instead of suppressing it
-- Pre-commit hooks MUST pass with `-D warnings` (treat warnings as errors)
+- Pre-commit hooks MUST pass (treat warnings as errors)
 - If build fails with warnings, FIX the warnings - don't suppress them
 - When facing extensive warnings, create a GitHub issue and systematic plan to address them
-- The only acceptable temporary measure is to create a focused story (like Story 053) to address them systematically
+
+{{languageQualityEnforcementContent}}
 
 **Exception Process (Rare):**
 
 1. Create GitHub issue explaining why the warning cannot be fixed
 2. Get team approval in issue comments
-3. Use the most targeted allow possible (function-level, not module-level)
+3. Use the most targeted suppression possible (function-level, not module-level)
 4. Add comment explaining why and link to issue
 5. Create follow-up story to address the underlying issue
-
-**Automated Enforcement:**
-
-- CI workflow automatically fails on any new allow attributes
-- Code quality test (`test_no_clippy_allow_attributes`) enforces zero-tolerance
-- Pre-commit hooks prevent allow attribute commits via pattern detection
-- {{qualityFlags}} treats all clippy warnings as build failures
 
 **Pre-commit Hook Enforcement:**
 
 - Pre-commit hooks are MANDATORY and must not be bypassed
 - Use `git commit --no-verify` only in genuine emergencies with team notification
 - If pre-commit hooks fail, fix the issues - don't bypass them
-- Allow attribute detection prevents commits with new suppressions
 
-Testing Discipline (Kent Beck)
-Work in strict Red → Green → Refactor loops with one failing test at a time.
+## Testing Discipline
 
-Use `{{testMcpCommand}}` for all tests; treat clippy warnings as errors.
+**Universal Principles (Kent Beck TDD):**
+- Work in strict Red → Green → Refactor loops with one failing test at a time
+- Write failing tests that capture behavioral intent, no more
+- Implement minimal code to make tests pass
+- Refactor while keeping tests green
 
-Functional Core / Imperative Shell
-Put pure logic in the core (no I/O, no mutation beyond local scope).
+{{languageTestingContent}}
 
-Keep an imperative shell for I/O; inject dependencies via traits.
-
-Model workflows as Result pipelines (railway style).
+**Functional Core / Imperative Shell:**
+- Put pure logic in the core (no I/O, no mutation beyond local scope)
+- Keep an imperative shell for I/O; inject dependencies via interfaces
+- Model workflows as Result pipelines (railway style)
 
 ## GitHub PR Workflow
 
@@ -292,16 +199,22 @@ The coordinator is a pure orchestrator - think of it as a project manager who do
 
 ## Code Quality Gates (CRITICAL)
 
-- All clippy warnings MUST be fixed, not suppressed with allow attributes
+**Universal Gates:**
+- All linter warnings MUST be fixed, not suppressed with inline overrides
 - Pre-commit hooks MUST pass without `--no-verify` bypasses
-- If extensive warnings exist, create a systematic cleanup story (see Story 053)
-- Never commit code that adds new allow attributes without explicit team approval
+- If extensive warnings exist, create a systematic cleanup story
+- Never commit code that adds new inline suppressions without explicit team approval
+
+{{languageQualityGatesContent}}
 
 ## Property-Based Testing
 
-Use proptest for invariants of domain types and parsers.
+**Universal Approach:**
+Use property-based testing for invariants of domain types and parsers.
 
 When a test reveals a representational gap, strengthen types so the failure becomes impossible.
+
+{{languagePropertyTestingContent}}
 
 ## Important Instruction Reminders
 
@@ -311,10 +224,12 @@ ALWAYS prefer editing an existing file to creating a new one.
 NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
 
 **CRITICAL CODE QUALITY RULES:**
-- NEVER add clippy allow attributes (`{{lintSuppressAttribute}}` or `{{globalLintSuppressAttribute}}`) without explicit team approval
+- NEVER add inline linter suppressions without explicit team approval
 - NEVER bypass pre-commit hooks with `--no-verify` unless it's a genuine emergency with team notification
-- ALWAYS fix clippy warnings instead of suppressing them
+- ALWAYS fix linter warnings instead of suppressing them
 - If facing many warnings, create a systematic cleanup story and plan - don't suppress them
+
+{{languageCriticalRulesContent}}
 
 **CRITICAL MEMORY STORAGE RULES:**
 - EVERY agent MUST store knowledge after significant actions

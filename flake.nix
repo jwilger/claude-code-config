@@ -14,6 +14,7 @@
         # Language-specific configurations
         languageConfigs = {
           rust = {
+            # Basic commands
             mcpServers = [ "cargo" "git" "github" "sparc-memory" ];
             testRunner = "cargo nextest run";
             testCommandFallback = "cargo test";
@@ -34,18 +35,80 @@
             packageManager = "cargo";
             languageName = "Rust";
             configFile = "Cargo.toml";
-            toolchain = "stable with clippy, rustfmt, rust-analyzer";
-            devTools = "cargo-nextest, cargo-watch, cargo-expand, cargo-edit";
-            projectArchitectureDescription = "Caxton is a **multi-agent orchestration server** that provides WebAssembly-based agent isolation, FIPA-compliant messaging, and comprehensive observability. It runs as a standalone server process (like PostgreSQL or Redis) rather than a library.";
-            domainPhilosophy = "type-driven development";
-            typeSystemFeatures = "Phantom types for agent state transitions (\\`Agent\\<Unloaded\\>\\` → \\`Agent\\<Loaded\\>\\` → \\`Agent\\<Running\\>\\`)";
-            typeLibrary = "nutype crate";
-            qualityFlags = "\\`RUSTFLAGS=\\\\\\\"-D warnings\\\\\\\"\\`";
-            lintSuppressAttribute = "#[allow(clippy::...)]";
-            globalLintSuppressAttribute = "#![allow(clippy::...)]";
             testMcpCommand = "mcp__cargo__cargo_test";
             lintMcpCommand = "mcp__cargo__cargo_clippy";
             formatCheckMcpCommand = "mcp__cargo__cargo_fmt_check";
+            
+            # Content blocks
+            languageDependencyContent = ''
+- Rust toolchain: stable with clippy, rustfmt, rust-analyzer
+- Development tools: cargo-nextest, cargo-watch, cargo-expand, cargo-edit
+- Optional: just for task automation'';
+            
+            languageTypeSystemContent = ''
+**Rust Implementation:**
+- All new domain types use `nutype` with `sanitize(...)` and `validate(...)`
+- Derive at least: `Clone, Debug, Eq, PartialEq, Display`; add `Serialize, Deserialize` where needed
+- Prefer `Result<T, DomainError>` over panics. Panics only for truly unreachable states
+
+**Example:**
+```rust
+#[nutype(
+  sanitize(trim),
+  validate(len(min = 1, max = 64)),
+  derive(Clone, Debug, Eq, PartialEq, Display)
+)]
+pub struct AgentName(String);
+```'';
+
+            languageQualityEnforcementContent = ''
+**Rust-Specific Enforcement:**
+- **NEVER** use `#![allow(clippy::...)]` or `#[allow(clippy::...)]` without explicit team approval
+- `RUSTFLAGS="-D warnings"` treats all clippy warnings as build failures
+- Code quality test (`test_no_clippy_allow_attributes`) enforces zero-tolerance
+- Pre-commit hooks prevent allow attribute commits via pattern detection'';
+
+            languageTestingContent = ''
+**Rust Testing:**
+- Use `mcp__cargo__cargo_test` for all tests; treat clippy warnings as errors
+- Prefer `cargo nextest run` over `cargo test` for better performance
+- Use `RUST_BACKTRACE=1` for detailed error traces'';
+
+            languageDevelopmentConventionsContent = ''
+**Rust-Specific Conventions:**
+- **Error Handling**: Use comprehensive `Result<T, DomainError>` types
+- **Tracing**: Instrument async functions with `#[instrument]`
+- **State Machines**: Use phantom types for compile-time state validation
+- **Testing**: Write property-based tests for validation logic using proptest'';
+
+            languageQualityGatesContent = ''
+**Rust Quality Gates:**
+- All clippy warnings MUST be fixed, not suppressed with allow attributes
+- Code quality test (`test_no_clippy_allow_attributes`) enforces zero-tolerance'';
+
+            languagePropertyTestingContent = ''
+**Rust Property Testing:**
+Use proptest for invariants of domain types and parsers.
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+    
+    proptest! {
+        #[test]
+        fn agent_name_roundtrip(s in "\\\\PC{1,64}") {
+            let name = AgentName::new(s).unwrap();
+            assert_eq!(name.as_str(), s.trim());
+        }
+    }
+}
+```'';
+
+            languageCriticalRulesContent = ''
+**Rust-Specific:**
+- NEVER add clippy allow attributes (`#[allow(clippy::...)]` or `#![allow(clippy::...)]`) without explicit team approval'';
           };
           
           typescript = {
@@ -110,6 +173,16 @@
               cp -r claude-templates/agents/* .claude/agents/
               
               # Generate CLAUDE.md from template with substitutions
+              # First escape newlines in content blocks
+              export LANG_DEP_CONTENT=$(echo "${config.languageDependencyContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
+              export LANG_TYPE_CONTENT=$(echo "${config.languageTypeSystemContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
+              export LANG_QUALITY_CONTENT=$(echo "${config.languageQualityEnforcementContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
+              export LANG_TESTING_CONTENT=$(echo "${config.languageTestingContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
+              export LANG_DEV_CONTENT=$(echo "${config.languageDevelopmentConventionsContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
+              export LANG_GATES_CONTENT=$(echo "${config.languageQualityGatesContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
+              export LANG_PROP_CONTENT=$(echo "${config.languagePropertyTestingContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
+              export LANG_CRIT_CONTENT=$(echo "${config.languageCriticalRulesContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
+              
               sed -e "s/{{testRunner}}/${config.testRunner}/g" \
                   -e "s/{{testCommandFallback}}/${config.testCommandFallback}/g" \
                   -e "s/{{testBacktraceEnv}}/${config.testBacktraceEnv}/g" \
@@ -123,24 +196,23 @@
                   -e "s/{{editCommand}}/${config.editCommand}/g" \
                   -e "s/{{addCommand}}/${config.addCommand}/g" \
                   -e "s/{{removeCommand}}/${config.removeCommand}/g" \
-                  -e "s|{{projectArchitectureDescription}}|${config.projectArchitectureDescription}|g" \
-                  -e "s/{{domainPhilosophy}}/${config.domainPhilosophy}/g" \
-                  -e "s|{{typeSystemFeatures}}|${config.typeSystemFeatures}|g" \
-                  -e "s/{{typeLibrary}}/${config.typeLibrary}/g" \
                   -e "s/{{buildSystem}}/${config.buildSystem}/g" \
                   -e "s/{{packageManager}}/${config.packageManager}/g" \
                   -e "s/{{languageName}}/${config.languageName}/g" \
                   -e "s/{{configFile}}/${config.configFile}/g" \
-                  -e "s|{{toolchain}}|${config.toolchain}|g" \
-                  -e "s|{{devTools}}|${config.devTools}|g" \
                   -e "s/{{testFramework}}/${config.testFramework}/g" \
-                  -e "s|{{qualityFlags}}|${config.qualityFlags}|g" \
-                  -e "s|{{lintSuppressAttribute}}|${config.lintSuppressAttribute}|g" \
-                  -e "s|{{globalLintSuppressAttribute}}|${config.globalLintSuppressAttribute}|g" \
                   -e "s/{{testMcpCommand}}/${config.testMcpCommand}/g" \
                   -e "s/{{lintMcpCommand}}/${config.lintMcpCommand}/g" \
                   -e "s/{{formatCheckMcpCommand}}/${config.formatCheckMcpCommand}/g" \
-                  CLAUDE.md.template > CLAUDE.base.md
+                  -e "s|{{languageDependencyContent}}|$LANG_DEP_CONTENT|g" \
+                  -e "s|{{languageTypeSystemContent}}|$LANG_TYPE_CONTENT|g" \
+                  -e "s|{{languageQualityEnforcementContent}}|$LANG_QUALITY_CONTENT|g" \
+                  -e "s|{{languageTestingContent}}|$LANG_TESTING_CONTENT|g" \
+                  -e "s|{{languageDevelopmentConventionsContent}}|$LANG_DEV_CONTENT|g" \
+                  -e "s|{{languageQualityGatesContent}}|$LANG_GATES_CONTENT|g" \
+                  -e "s|{{languagePropertyTestingContent}}|$LANG_PROP_CONTENT|g" \
+                  -e "s|{{languageCriticalRulesContent}}|$LANG_CRIT_CONTENT|g" \
+                  CLAUDE.md.template | sed 's/\\n/\n/g' > CLAUDE.base.md
 
               # Create language-specific MCP settings
               cat > .claude/settings.json << 'EOF'
