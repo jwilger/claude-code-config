@@ -1,0 +1,108 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Development Commands
+
+### Testing
+
+Always use `${TEST_COMMAND}` for testing:
+
+${TEST_COMMAND_OPTIONS}
+
+### Building and Linting
+
+```bash
+${BUILD_COMMANDS}
+```
+
+### Development Tools
+
+```bash
+${DEV_TOOLS_COMMANDS}
+```
+
+## Architecture Overview
+
+${PROJECT_NAME} follows **type-driven development** principles:
+
+- Illegal states are unrepresentable through the type system
+- ${TYPE_SYSTEM_PATTERNS}
+- Smart constructors with validation
+- Comprehensive error types with domain-specific variants
+- ${DOMAIN_TYPE_LIBRARY}
+
+${LANGUAGE_SPECIFIC_ARCHITECTURE}
+
+## ${LANGUAGE_NAME} Type-Driven Rules
+
+- **Illegal states are unrepresentable**: prefer domain types over primitives.
+- ${TYPE_CREATION_PATTERN}
+- ${ERROR_HANDLING_PATTERN}
+
+### Example
+
+```${LANGUAGE_CODE}
+${TYPE_EXAMPLE}
+```
+
+## Code Quality Enforcement - CRITICAL
+
+**NEVER ADD ALLOW ATTRIBUTES** - This is a hard rule with zero exceptions without team approval.
+
+- **NEVER** use ${LINT_ALLOW_PATTERN} without explicit team approval
+- **NEVER** bypass pre-commit hooks or ignore ${LINTER} warnings/errors
+- **ALWAYS** fix the underlying issue causing the warning instead of suppressing it
+- Pre-commit hooks MUST pass with warnings treated as errors
+
+## Testing Discipline (Kent Beck)
+
+Work in strict Red → Green → Refactor loops with one failing test at a time.
+
+Use ${TEST_RUNNER} for all tests; treat ${LINTER} warnings as errors.
+
+## Functional Core / Imperative Shell
+
+Put pure logic in the core (no I/O, no mutation beyond local scope).
+
+Keep an imperative shell for I/O; inject dependencies via ${DEPENDENCY_INJECTION_PATTERN}.
+
+Model workflows as ${ERROR_PIPELINE_PATTERN}.
+
+${SPARC_WORKFLOW_SECTION}
+
+## Development Conventions
+
+- **Error Handling**: Use ${ERROR_HANDLING_STRATEGY}
+- **Resource Safety**: Always validate resource limits before allocation
+- **State Machines**: Use ${STATE_MACHINE_PATTERN} for compile-time state validation
+- **Testing**: Write property-based tests for validation logic
+- **Dependency Management**: Always use package manager CLI tools (${PACKAGE_MANAGER_COMMANDS}) to install/update dependencies.
+
+## External Dependencies
+
+The project uses Nix for development environment management:
+
+- ${LANGUAGE_NAME} toolchain: ${TOOLCHAIN_DESCRIPTION}
+- Development tools: ${DEV_TOOLS_LIST}
+- Optional: just for task automation
+- Ad-hoc: use `nix shell` to use a tool that is not currently installed.
+
+## Important Instructions
+
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+
+**CRITICAL CODE QUALITY RULES:**
+- NEVER add ${LINT_ALLOW_PATTERN} without explicit team approval
+- NEVER bypass pre-commit hooks with --no-verify unless it's a genuine emergency with team notification
+- ALWAYS fix ${LINTER} warnings instead of suppressing them
+- If facing many warnings, create a systematic cleanup story and plan - don't suppress them
+
+**CRITICAL MEMORY STORAGE RULES:**
+- EVERY agent MUST store knowledge after significant actions
+- Research findings, planning decisions, implementation patterns, and insights MUST be preserved
+- The SPARC orchestrator will enforce memory storage compliance
+- Knowledge not stored represents wasted learning opportunities and repeated mistakes
