@@ -40,7 +40,7 @@
             domainPhilosophy = "type-driven development";
             typeSystemFeatures = "Phantom types for agent state transitions (`Agent<Unloaded>` → `Agent<Loaded>` → `Agent<Running>`)";
             typeLibrary = "nutype crate";
-            qualityFlags = "`RUSTFLAGS=\\\"-D warnings\\\"\"";
+            qualityFlags = "\\`RUSTFLAGS=\\\\\\\"-D warnings\\\\\\\"\\`";
             lintSuppressAttribute = "#[allow(clippy::...)]";
             globalLintSuppressAttribute = "#![allow(clippy::...)]";
             testMcpCommand = "mcp__cargo__cargo_test";
