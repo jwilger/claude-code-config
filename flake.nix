@@ -63,8 +63,8 @@
             cp -r ${./.claude/commands}/* .claude/commands/ 2>/dev/null || true
             cp -r ${./.claude/hooks}/* .claude/hooks/ 2>/dev/null || true
             
-            # Create language-specific CLAUDE.md
-            cat > .claude/CLAUDE.md << 'EOF'
+            # Create language-specific CLAUDE.md in project root
+            cat > CLAUDE.md << 'EOF'
 # CLAUDE.md
 
 This file provides guidance to Claude Code when working with this ${language} project.
@@ -105,7 +105,7 @@ EOF
             
             echo "✅ Claude Code configuration complete with ${language}-specific setup!"
             echo "📁 Created:"
-            echo "  .claude/CLAUDE.md (${language}-specific commands)"
+            echo "  CLAUDE.md (${language}-specific commands)"
             echo "  .claude/settings.json (${builtins.toString (builtins.length config.mcpServers)} MCP servers)"
             echo "  .claude/agents/ (SPARC workflow agents)"
             echo "  .claude/commands/ (custom slash commands)"  
