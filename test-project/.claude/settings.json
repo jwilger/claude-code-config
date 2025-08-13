@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "git": {
+      "command": "git",
+      "args": []
+    },
+    "github": {
+      "command": "gh",
+      "args": []  
+    },
+    "sparc-memory": {
+      "command": "sparc-memory-server",
+      "args": []
+    }
+  }
+}

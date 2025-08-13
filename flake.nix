@@ -1,130 +1,174 @@
 {
-  description = "Multi-language Claude Code configuration package";
+  description = "Claude Code configuration for existing projects";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    rust-overlay,
-    flake-utils,
-  }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
       let
-        overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-          config.allowUnfree = true;
-        };
-      in
-      {
-        # Main library interface for projects to consume
-        lib = import ./modules/lib.nix {
-          inherit pkgs system;
-          inherit (self) inputs;
+        pkgs = import nixpkgs { inherit system; };
+        
+        # Language-specific configurations (inline to avoid module complexity)
+        languageConfigs = {
+          rust = {
+            mcpServers = [ "cargo" "git" "github" "sparc-memory" ];
+            testCommand = "cargo nextest run || cargo test";
+            lintCommand = "cargo clippy -- -D warnings";
+            formatCommand = "cargo fmt";
+          };
+          typescript = {
+            mcpServers = [ "nodejs" "git" "github" "sparc-memory" ];
+            testCommand = "npm test";
+            lintCommand = "npm run lint || echo 'No lint script'";
+            formatCommand = "npm run format || echo 'No format script'";
+          };
+          python = {
+            mcpServers = [ "git" "github" "sparc-memory" ];
+            testCommand = "pytest";
+            lintCommand = "ruff check .";
+            formatCommand = "ruff format .";
+          };
+          elixir = {
+            mcpServers = [ "mix" "git" "github" "sparc-memory" ];
+            testCommand = "mix test";
+            lintCommand = "mix credo";
+            formatCommand = "mix format";
+          };
         };
 
-        # Default development shell for the claude-config project itself
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            git
-            nix
-            nixpkgs-fmt
-          ];
+        # Setup script with proper language-specific configuration
+        setupClaudeConfig = language: 
+          let
+            config = languageConfigs.${language};
+            mcpServersJson = builtins.toJSON {
+              mcpServers = builtins.listToAttrs (map (server: {
+                name = server;
+                value = {
+                  command = server;
+                  args = [];
+                };
+              }) config.mcpServers);
+            };
+          in pkgs.writeShellScript "setup-claude-${language}" ''
+            echo "Setting up Claude Code configuration for ${language}..."
+            
+            # Create .claude directory structure
+            mkdir -p .claude/{agents,commands,hooks}
+            
+            # Copy agents and commands
+            cp -r ${./.claude/agents}/* .claude/agents/ 2>/dev/null || true
+            cp -r ${./.claude/commands}/* .claude/commands/ 2>/dev/null || true
+            cp -r ${./.claude/hooks}/* .claude/hooks/ 2>/dev/null || true
+            
+            # Create language-specific CLAUDE.md
+            cat > .claude/CLAUDE.md << 'EOF'
+# CLAUDE.md
 
-          shellHook = ''
-            echo "🔧 Claude Config Development Environment"
-            echo "Available commands:"
-            echo "  nix flake check      # Validate flake"
-            echo "  nixpkgs-fmt .        # Format nix files"
-            echo ""
+This file provides guidance to Claude Code when working with this ${language} project.
+
+## SPARC Workflow Integration
+
+This project uses the SPARC workflow with GitHub pull requests and memory storage.
+
+## Language: ${language}
+
+### Testing
+\`\`\`bash
+${config.testCommand}
+\`\`\`
+
+### Linting  
+\`\`\`bash
+${config.lintCommand}
+\`\`\`
+
+### Formatting
+\`\`\`bash
+${config.formatCommand}
+\`\`\`
+
+## Quality Standards
+
+- Follow TDD principles with Red→Green→Refactor cycles
+- Maintain comprehensive test coverage
+- Use type-driven development where applicable
+- Store knowledge in MCP memory after each SPARC phase
+EOF
+
+            # Create language-specific MCP settings
+            cat > .claude/settings.json << 'EOF'
+${mcpServersJson}
+EOF
+            
+            echo "✅ Claude Code configuration complete with ${language}-specific setup!"
+            echo "📁 Created:"
+            echo "  .claude/CLAUDE.md (${language}-specific commands)"
+            echo "  .claude/settings.json (${builtins.toString (builtins.length config.mcpServers)} MCP servers)"
+            echo "  .claude/agents/ (SPARC workflow agents)"
+            echo "  .claude/commands/ (custom slash commands)"  
+            echo "  .claude/hooks/ (quality enforcement hooks)"
           '';
-        };
-
-        # Development shells for different languages (examples)
+        
+      in {
+        # Development shells that add Claude Code to existing projects
         devShells = {
-          rust-example = self.lib.${system}.mkDevShell {
-            language = "rust";
-            tooling = {
-              testRunner = "nextest";
-              linter = "clippy";
-              formatter = "rustfmt";
-            };
-            features = [ "sparc-workflow" "memory-storage" "git-safety" ];
+          rust = pkgs.mkShell {
+            buildInputs = with pkgs; [ git gh nodejs python3 ];
+            shellHook = ''
+              echo "🦀 Rust project with Claude Code"
+              if [ ! -d ".claude" ]; then
+                ${setupClaudeConfig "rust"}
+              fi
+            '';
           };
 
-          elixir-example = self.lib.${system}.mkDevShell {
-            language = "elixir";
-            tooling = {
-              testRunner = "mix-test";
-              linter = "credo";
-              formatter = "mix-format";
-              typeChecker = "dialyzer";
-            };
-            features = [ "sparc-workflow" "memory-storage" ];
+          typescript = pkgs.mkShell {
+            buildInputs = with pkgs; [ git gh nodejs python3 ];
+            shellHook = ''
+              echo "⚡ TypeScript project with Claude Code"
+              if [ ! -d ".claude" ]; then
+                ${setupClaudeConfig "typescript"}
+              fi
+            '';
           };
 
-          typescript-example = self.lib.${system}.mkDevShell {
-            language = "typescript";
-            tooling = {
-              testRunner = "vitest";
-              linter = "eslint";
-              formatter = "prettier";
-              typeChecker = "tsc";
-              packageManager = "pnpm";
-            };
-            features = [ "sparc-workflow" "memory-storage" ];
+          python = pkgs.mkShell {
+            buildInputs = with pkgs; [ git gh nodejs python3 ];
+            shellHook = ''
+              echo "🐍 Python project with Claude Code"
+              if [ ! -d ".claude" ]; then
+                ${setupClaudeConfig "python"}
+              fi
+            '';
           };
 
-          python-example = self.lib.${system}.mkDevShell {
-            language = "python";
-            tooling = {
-              testRunner = "pytest";
-              linter = "ruff";
-              formatter = "ruff-format";
-              typeChecker = "mypy";
-              packageManager = "poetry";
-            };
-            features = [ "sparc-workflow" "memory-storage" ];
-          };
-        };
-
-        # Package templates for different languages
-        packages = {
-          templates = pkgs.stdenv.mkDerivation {
-            name = "claude-config-templates";
-            src = ./templates;
-            installPhase = ''
-              mkdir -p $out
-              cp -r * $out/
+          elixir = pkgs.mkShell {
+            buildInputs = with pkgs; [ git gh nodejs python3 ];
+            shellHook = ''
+              echo "💜 Elixir project with Claude Code"
+              if [ ! -d ".claude" ]; then
+                ${setupClaudeConfig "elixir"}
+              fi
             '';
           };
         };
+
+        # Library function for other flakes to use
+        lib.addClaudeCode = language: existingShellHook: existingShellHook + ''
+          # Add Claude Code configuration
+          if [ ! -d ".claude" ]; then
+            echo "Setting up Claude Code for ${language}..."
+            ${setupClaudeConfig language}
+          fi
+        '';
       }
     ) // {
-      # Flake templates for easy initialization (system-independent)
-      templates = {
-        rust = {
-          path = ./templates/rust;
-          description = "Rust project with Claude Code configuration";
-        };
-        elixir = {
-          path = ./templates/elixir;
-          description = "Elixir project with Claude Code configuration";
-        };
-        typescript = {
-          path = ./templates/typescript;
-          description = "TypeScript project with Claude Code configuration";
-        };
-        python = {
-          path = ./templates/python;
-          description = "Python project with Claude Code configuration";
-        };
+      templates.claude = {
+        path = ./templates/claude;
+        description = "Add Claude Code configuration to existing projects";
       };
     };
 }

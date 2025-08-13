@@ -122,9 +122,4 @@ ${generateSettingsJson lang}EOF
     
     echo "Generated MCP server configuration for $language"
   '';
-
-in
-{
-  # Export the shell script and utility functions
-  inherit generateMcpSettings;
 }

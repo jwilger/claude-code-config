@@ -489,9 +489,4 @@ ${hookScripts.${lang}}EOF
     
     echo "Generated language-specific hooks for $language"
   '';
-
-in
-{
-  # Export the shell scripts
-  inherit generateClaudeConfig generateHooks;
 }

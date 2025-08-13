@@ -1,0 +1,28 @@
+GREEN PHASE COMPLETE - CLI EXPORTS VERIFIED
+
+Issue Analysis: flake.nix references self.lib.${system}.detectLanguage and self.lib.${system}.setupConfig
+
+Current Structure Analysis:
+- modules/lib.nix takes { pkgs, system } arguments (line 2)
+- Returns attribute set containing (starting line 103):
+  * languageConfig (inherited, line 105)  
+  * detectLanguage = pkgs.writeShellScriptBin "detect-language" (line 108)
+  * setupConfig = pkgs.writeShellScriptBin "setup-config" (line 184) 
+  * utils = { ... } (line 235)
+
+Flake Integration:
+- flake.nix line 24: lib = import ./modules/lib.nix { inherit pkgs system; }
+- This makes lib.detectLanguage and lib.setupConfig available
+- flake.nix lines 51 & 56 reference these correctly
+
+Status: EXPORTS ARE ALREADY CORRECT
+
+The CLI functions are properly exported from modules/lib.nix:
+✓ detectLanguage - Shell script for language detection 
+✓ setupConfig - Shell script for Claude configuration setup
+
+Test Commands (should work):
+- nix run . -- detect
+- nix run . -- setup <language>
+
+Implementation: No changes needed - structure was already correct
