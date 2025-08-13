@@ -18,24 +18,36 @@
             testCommand = "cargo nextest run || cargo test";
             lintCommand = "cargo clippy -- -D warnings";
             formatCommand = "cargo fmt";
+            mcpTools = [ "mcp__cargo__cargo_test" "mcp__cargo__cargo_check" "mcp__cargo__cargo_clippy" ];
+            testFramework = "Rust's built-in test framework";
+            buildSystem = "Cargo";
           };
           typescript = {
             mcpServers = [ "nodejs" "git" "github" "sparc-memory" ];
             testCommand = "npm test";
             lintCommand = "npm run lint || echo 'No lint script'";
             formatCommand = "npm run format || echo 'No format script'";
+            mcpTools = [ "mcp__nodejs__run_script" ];
+            testFramework = "Jest/Vitest/npm test scripts";
+            buildSystem = "npm/pnpm/yarn";
           };
           python = {
             mcpServers = [ "git" "github" "sparc-memory" ];
             testCommand = "pytest";
             lintCommand = "ruff check .";
             formatCommand = "ruff format .";
+            mcpTools = [ ];
+            testFramework = "pytest";
+            buildSystem = "pip/poetry/uv";
           };
           elixir = {
             mcpServers = [ "mix" "git" "github" "sparc-memory" ];
             testCommand = "mix test";
             lintCommand = "mix credo";
             formatCommand = "mix format";
+            mcpTools = [ "mcp__mix__test" ];
+            testFramework = "ExUnit";
+            buildSystem = "Mix";
           };
         };
 
@@ -58,8 +70,85 @@
             # Create .claude directory structure
             mkdir -p .claude/{agents,commands,hooks}
             
-            # Copy agents and commands
-            cp -r ${./.claude/agents}/* .claude/agents/ 2>/dev/null || true
+            # Generate language-specific agents
+            cat > .claude/agents/expert.md << 'EOF'
+---
+name: expert
+description: Provide expert review and validation of code quality, architecture decisions, and implementation approaches for ${language} projects.
+tools: Read, Grep, Glob, ${builtins.concatStringsSep ", " (config.mcpTools ++ ["mcp__git__git_status" "mcp__git__git_diff" "mcp__sparc-memory__create_entities" "mcp__sparc-memory__create_relations" "mcp__sparc-memory__add_observations" "mcp__sparc-memory__search_nodes" "mcp__sparc-memory__open_nodes"])}
+---
+
+# Expert Agent - ${language}
+
+You are the expert review specialist for ${language} projects using SPARC workflows.
+
+## Language-Specific Focus
+
+- **Build System**: ${config.buildSystem}  
+- **Test Framework**: ${config.testFramework}
+- **Quality Commands**: ${config.lintCommand}, ${config.formatCommand}
+
+## Core Responsibilities
+
+### 1. ${language} Code Quality Review
+- Correctness verification using ${config.testFramework}
+- Performance analysis for ${language} applications  
+- ${language}-specific best practices and idioms
+- Security review for ${language} applications
+
+### 2. Architecture Review
+- Evaluate ${language} project structure and organization
+- Review dependency management via ${config.buildSystem}
+- Assess maintainability and extensibility
+
+Use \`${config.testCommand}\` to run tests and \`${config.lintCommand}\` for quality checks.
+EOF
+
+            # Generate red-implementer agent  
+            cat > .claude/agents/red-implementer.md << 'EOF'
+---
+name: red-implementer
+description: Write FAILING tests that capture behavioral intent for ${language} projects.
+tools: Read, Edit, MultiEdit, Write, Grep, Glob, ${builtins.concatStringsSep ", " (config.mcpTools ++ ["mcp__git__git_status" "mcp__git__git_diff" "mcp__sparc-memory__create_entities" "mcp__sparc-memory__create_relations" "mcp__sparc-memory__add_observations" "mcp__sparc-memory__search_nodes" "mcp__sparc-memory__open_nodes"])}
+---
+
+# Red Implementer - ${language}
+
+Write failing tests for ${language} using ${config.testFramework}.
+
+## ${language} Testing Approach
+
+- **Framework**: ${config.testFramework}
+- **Run Command**: \`${config.testCommand}\`
+- **Build System**: ${config.buildSystem}
+
+## Failure Verification
+
+Always verify test fails by running: \`${config.testCommand}\`
+EOF
+
+            # Generate green-implementer agent
+            cat > .claude/agents/green-implementer.md << 'EOF'
+---
+name: green-implementer  
+description: Implement minimal code to make failing tests pass in ${language}.
+tools: Read, Edit, MultiEdit, Write, Grep, Glob, ${builtins.concatStringsSep ", " (config.mcpTools ++ ["mcp__git__git_status" "mcp__git__git_diff" "mcp__sparc-memory__create_entities" "mcp__sparc-memory__create_relations" "mcp__sparc-memory__add_observations" "mcp__sparc-memory__search_nodes" "mcp__sparc-memory__open_nodes"])}
+---
+
+# Green Implementer - ${language}
+
+Implement minimal ${language} code to make tests pass.
+
+## ${language} Implementation
+
+- **Test Command**: \`${config.testCommand}\`
+- **Build System**: ${config.buildSystem}
+- **Quality Check**: \`${config.lintCommand}\`
+
+Apply the simplest solution that makes tests pass.
+EOF
+
+            # Copy commands and hooks (these are language-agnostic)  
             cp -r ${./.claude/commands}/* .claude/commands/ 2>/dev/null || true
             cp -r ${./.claude/hooks}/* .claude/hooks/ 2>/dev/null || true
             
