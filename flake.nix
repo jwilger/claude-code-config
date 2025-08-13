@@ -38,7 +38,7 @@
             devTools = "cargo-nextest, cargo-watch, cargo-expand, cargo-edit";
             projectArchitectureDescription = "Caxton is a **multi-agent orchestration server** that provides WebAssembly-based agent isolation, FIPA-compliant messaging, and comprehensive observability. It runs as a standalone server process (like PostgreSQL or Redis) rather than a library.";
             domainPhilosophy = "type-driven development";
-            typeSystemFeatures = "Phantom types for agent state transitions (`Agent<Unloaded>` → `Agent<Loaded>` → `Agent<Running>`)";
+            typeSystemFeatures = "Phantom types for agent state transitions (\\`Agent\\<Unloaded\\>\\` → \\`Agent\\<Loaded\\>\\` → \\`Agent\\<Running\\>\\`)";
             typeLibrary = "nutype crate";
             qualityFlags = "\\`RUSTFLAGS=\\\\\\\"-D warnings\\\\\\\"\\`";
             lintSuppressAttribute = "#[allow(clippy::...)]";
