@@ -15,12 +15,39 @@
         languageConfigs = {
           rust = {
             mcpServers = [ "cargo" "git" "github" "sparc-memory" ];
-            testCommand = "cargo nextest run || cargo test";
-            lintCommand = "cargo clippy -- -D warnings";
+            testRunner = "cargo nextest run";
+            testCommandFallback = "cargo test";
+            testBacktraceEnv = "RUST_BACKTRACE";
+            buildCommand = "cargo build";
+            buildRelease = "cargo build --release";
+            checkCommand = "cargo check";
+            lintCommand = "cargo clippy";
             formatCommand = "cargo fmt";
+            formatCheckCommand = "cargo fmt --check";
+            watchCommand = "cargo watch -x test";
+            expandCommand = "cargo expand";
+            editCommand = "cargo edit";
+            addCommand = "cargo add";
+            removeCommand = "cargo remove";
             mcpTools = [ "mcp__cargo__cargo_test" "mcp__cargo__cargo_check" "mcp__cargo__cargo_clippy" ];
-            testFramework = "Rust's built-in test framework";
+            testFramework = "nextest";
             buildSystem = "Cargo";
+            packageManager = "cargo";
+            packageManagerTools = "cargo add, cargo remove";
+            configFile = "Cargo.toml";
+            toolchain = "stable with clippy, rustfmt, rust-analyzer";
+            devTools = "cargo-nextest, cargo-watch, cargo-expand, cargo-edit";
+            architecture = "multi-agent orchestration server";
+            domainPhilosophy = "type-driven development";
+            typeSystemFeatures = "Phantom types for agent state transitions (`Agent<Unloaded>` → `Agent<Loaded>` → `Agent<Running>`)";
+            typeLibrary = "nutype crate";
+            qualityRules = "NEVER ADD ALLOW ATTRIBUTES - treat warnings as errors";
+            qualityFlags = "RUSTFLAGS=\"-D warnings\"";
+            lintSuppressAttribute = "#[allow(clippy::...)]";
+            globalLintSuppressAttribute = "#![allow(clippy::...)]";
+            testMcpCommand = "mcp__cargo__cargo_test";
+            lintMcpCommand = "mcp__cargo__cargo_clippy";
+            formatCheckMcpCommand = "mcp__cargo__cargo_fmt_check";
           };
           typescript = {
             mcpServers = [ "nodejs" "git" "github" "sparc-memory" ];
@@ -65,6 +92,13 @@
               }) config.mcpServers);
             };
           in pkgs.writeShellScript "setup-claude-${language}" ''
+            # Only set up if Claude configuration doesn't exist
+            if [ -f "CLAUDE.md" ] && [ -d ".claude" ]; then
+              echo "✅ Claude Code already configured - skipping setup"
+              echo "   Existing CLAUDE.md and .claude/ preserved"
+              exit 0
+            fi
+            
             echo "Setting up Claude Code configuration for ${language}..."
             
             # Create .claude directory structure
@@ -148,43 +182,92 @@ Implement minimal ${language} code to make tests pass.
 Apply the simplest solution that makes tests pass.
 EOF
 
-            # Copy commands and hooks (these are language-agnostic)  
-            cp -r ${./.claude/commands}/* .claude/commands/ 2>/dev/null || true
-            cp -r ${./.claude/hooks}/* .claude/hooks/ 2>/dev/null || true
+            # Copy language-agnostic templates and generate language-specific content
+            cp -r ${./templates/claude-templates/commands}/* .claude/commands/ 2>/dev/null || true
+            cp -r ${./templates/claude-templates/hooks}/* .claude/hooks/ 2>/dev/null || true
+            cp -r ${./templates/claude-templates/agents}/* .claude/agents/ 2>/dev/null || true
             
-            # Create language-specific CLAUDE.md in project root
+            # Generate CLAUDE.md from template
             cat > CLAUDE.md << 'EOF'
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working with this ${language} project.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## SPARC Workflow Integration
-
-This project uses the SPARC workflow with GitHub pull requests and memory storage.
-
-## Language: ${language}
+## Development Commands
 
 ### Testing
+
+Always use \`${config.testRunner}\` instead of \`${config.testCommandFallback}\`:
+
 \`\`\`bash
-${config.testCommand}
+${config.testRunner}                    # Run all tests
+${config.testRunner} --lib             # Unit tests only
+${config.testRunner} --tests           # Integration tests only
+${config.testRunner} --nocapture       # Show test output
+RUST_BACKTRACE=1 ${config.testRunner}  # With backtrace on failure
 \`\`\`
 
-### Linting  
+### Building and Linting
+
 \`\`\`bash
-${config.lintCommand}
+${config.buildCommand}                          # Build the project
+${config.buildRelease}              # Release build
+${config.checkCommand}                         # Fast syntax/type checking
+${config.lintCommand}                        # Linting (strict rules enabled)
+${config.formatCommand}                          # Format code
 \`\`\`
 
-### Formatting
+### Development Tools
+
 \`\`\`bash
-${config.formatCommand}
+${config.watchCommand}                 # Auto-run tests on changes
+${config.expandCommand}                       # Macro expansion
+${config.editCommand}                         # Dependency management
 \`\`\`
 
-## Quality Standards
+## Architecture Overview
 
-- Follow TDD principles with Red→Green→Refactor cycles
-- Maintain comprehensive test coverage
-- Use type-driven development where applicable
-- Store knowledge in MCP memory after each SPARC phase
+This is a **${config.architecture}** that provides WebAssembly-based agent isolation, FIPA-compliant messaging, and comprehensive observability. It runs as a standalone server process (like PostgreSQL or Redis) rather than a library.
+
+### Core Components
+
+- **Agent Runtime Environment**: Manages WebAssembly agent lifecycle with sandboxing and resource limits
+- **FIPA Message Router**: High-performance async message routing between agents with conversation tracking
+- **Security & Sandboxing**: WebAssembly isolation with CPU/memory limits and host function restrictions
+- **Observability Layer**: Built-in structured logging, metrics (Prometheus), and distributed tracing (OpenTelemetry)
+- **Agent Lifecycle Management**: Deployment strategies including blue-green, canary, and shadow deployments
+
+### Domain Model Philosophy
+
+The codebase follows **${config.domainPhilosophy}** principles:
+
+- Illegal states are unrepresentable through the type system
+- ${config.typeSystemFeatures}
+- Smart constructors with validation (e.g., \`AgentId\`, \`Percentage\`)
+- Comprehensive error types with domain-specific variants
+- nutype crate for eliminating primitive obsession
+
+### Key Domain Types
+
+Located in \`src/domain_types.rs\` and \`src/domain/\`:
+
+- **Agent Identity**: \`AgentId\`, \`AgentName\` with validation
+- **Resources**: \`CpuFuel\`, \`MemoryBytes\`, \`MaxAgentMemory\` with limits
+- **Messaging**: \`MessageId\`, \`ConversationId\`, \`Performative\` for FIPA compliance
+- **Deployment**: \`DeploymentId\`, \`DeploymentStrategy\`, \`DeploymentStatus\` for lifecycle management
+- **Security**: \`WasmSecurityPolicy\`, \`ResourceLimits\`, \`ValidationRule\` for sandboxing
+
+[... rest of Caxton's comprehensive CLAUDE.md content ...]
+
+## Code Quality Enforcement - CRITICAL
+
+**${config.qualityRules}** - This is a hard rule with zero exceptions without team approval.
+
+- **NEVER** use \`#![allow(clippy::...)]\` or \`#[allow(clippy::...)]\` without explicit team approval
+- **NEVER** bypass pre-commit hooks or ignore clippy warnings/errors  
+- **ALWAYS** fix the underlying issue causing the warning instead of suppressing it
+- Pre-commit hooks MUST pass with \`-D warnings\` (treat warnings as errors)
+
 EOF
 
             # Create language-specific MCP settings
