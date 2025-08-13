@@ -36,7 +36,7 @@ Always use `{{testRunner}}` instead of `{{testCommandFallback}}`:
 
 ## Architecture Overview
 
-This project is a **{{architecture}}** that provides WebAssembly-based agent isolation, FIPA-compliant messaging, and comprehensive observability. It runs as a standalone server process (like PostgreSQL or Redis) rather than a library.
+{{projectArchitectureDescription}}
 
 ### Core Components
 
@@ -128,13 +128,13 @@ Reference the ADR documentation in `docs/adr/` for detailed rationales:
 
 The project uses Nix for development environment management:
 
-- {{buildSystem}} toolchain: {{toolchain}}
+- {{languageName}} toolchain: {{toolchain}}
 - Development tools: {{devTools}}
 - Optional: just for task automation
 - Ad-hoc: use `nix shell` to use a tool that is not currently installed.
 - Update Flake: For tools you regularly use, consider adding them to the flake.nix file
 
-## {{buildSystem}} Type-Driven Rules
+## {{languageName}} Type-Driven Rules
 
 - **Illegal states are unrepresentable**: prefer domain types over primitives.
 - All new domain types use `nutype` with `sanitize(...)` and `validate(...)`. Derive at least: `Clone, Debug, Eq, PartialEq, Display`; add `Serialize, Deserialize` where needed.
@@ -156,7 +156,7 @@ pub struct AgentName(String);
 **NEVER ADD ALLOW ATTRIBUTES** - This is a hard rule with zero exceptions without team approval.
 
 - **NEVER** use `{{globalLintSuppressAttribute}}` or `{{lintSuppressAttribute}}` without explicit team approval
-- **NEVER** bypass pre-commit hooks or ignore {{packageManager}} warnings/errors
+- **NEVER** bypass pre-commit hooks or ignore clippy warnings/errors
 - **ALWAYS** fix the underlying issue causing the warning instead of suppressing it
 - Pre-commit hooks MUST pass with `-D warnings` (treat warnings as errors)
 - If build fails with warnings, FIX the warnings - don't suppress them
@@ -176,7 +176,7 @@ pub struct AgentName(String);
 - CI workflow automatically fails on any new allow attributes
 - Code quality test (`test_no_clippy_allow_attributes`) enforces zero-tolerance
 - Pre-commit hooks prevent allow attribute commits via pattern detection
-- {{qualityFlags}} treats all {{packageManager}} warnings as build failures
+- {{qualityFlags}} treats all clippy warnings as build failures
 
 **Pre-commit Hook Enforcement:**
 
@@ -188,7 +188,7 @@ pub struct AgentName(String);
 Testing Discipline (Kent Beck)
 Work in strict Red → Green → Refactor loops with one failing test at a time.
 
-Use `{{testMcpCommand}}` for all tests; treat {{packageManager}} warnings as errors.
+Use `{{testMcpCommand}}` for all tests; treat clippy warnings as errors.
 
 Functional Core / Imperative Shell
 Put pure logic in the core (no I/O, no mutation beyond local scope).
@@ -292,7 +292,7 @@ The coordinator is a pure orchestrator - think of it as a project manager who do
 
 ## Code Quality Gates (CRITICAL)
 
-- All {{packageManager}} warnings MUST be fixed, not suppressed with allow attributes
+- All clippy warnings MUST be fixed, not suppressed with allow attributes
 - Pre-commit hooks MUST pass without `--no-verify` bypasses
 - If extensive warnings exist, create a systematic cleanup story (see Story 053)
 - Never commit code that adds new allow attributes without explicit team approval
@@ -311,9 +311,9 @@ ALWAYS prefer editing an existing file to creating a new one.
 NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
 
 **CRITICAL CODE QUALITY RULES:**
-- NEVER add {{packageManager}} allow attributes (`{{lintSuppressAttribute}}` or `{{globalLintSuppressAttribute}}`) without explicit team approval
+- NEVER add clippy allow attributes (`{{lintSuppressAttribute}}` or `{{globalLintSuppressAttribute}}`) without explicit team approval
 - NEVER bypass pre-commit hooks with `--no-verify` unless it's a genuine emergency with team notification
-- ALWAYS fix {{packageManager}} warnings instead of suppressing them
+- ALWAYS fix clippy warnings instead of suppressing them
 - If facing many warnings, create a systematic cleanup story and plan - don't suppress them
 
 **CRITICAL MEMORY STORAGE RULES:**

@@ -32,14 +32,15 @@
             testFramework = "nextest";
             buildSystem = "Cargo";
             packageManager = "cargo";
+            languageName = "Rust";
             configFile = "Cargo.toml";
             toolchain = "stable with clippy, rustfmt, rust-analyzer";
             devTools = "cargo-nextest, cargo-watch, cargo-expand, cargo-edit";
-            architecture = "multi-agent orchestration server";
+            projectArchitectureDescription = "Caxton is a **multi-agent orchestration server** that provides WebAssembly-based agent isolation, FIPA-compliant messaging, and comprehensive observability. It runs as a standalone server process (like PostgreSQL or Redis) rather than a library.";
             domainPhilosophy = "type-driven development";
-            typeSystemFeatures = "Phantom types for agent state transitions (Agent<Unloaded> → Agent<Loaded> → Agent<Running>)";
+            typeSystemFeatures = "Phantom types for agent state transitions (`Agent<Unloaded>` → `Agent<Loaded>` → `Agent<Running>`)";
             typeLibrary = "nutype crate";
-            qualityFlags = "RUSTFLAGS=\\\"-D warnings\\\"";
+            qualityFlags = "`RUSTFLAGS=\\\"-D warnings\\\"\"";
             lintSuppressAttribute = "#[allow(clippy::...)]";
             globalLintSuppressAttribute = "#![allow(clippy::...)]";
             testMcpCommand = "mcp__cargo__cargo_test";
@@ -122,12 +123,13 @@
                   -e "s/{{editCommand}}/${config.editCommand}/g" \
                   -e "s/{{addCommand}}/${config.addCommand}/g" \
                   -e "s/{{removeCommand}}/${config.removeCommand}/g" \
-                  -e "s/{{architecture}}/${config.architecture}/g" \
+                  -e "s|{{projectArchitectureDescription}}|${config.projectArchitectureDescription}|g" \
                   -e "s/{{domainPhilosophy}}/${config.domainPhilosophy}/g" \
                   -e "s|{{typeSystemFeatures}}|${config.typeSystemFeatures}|g" \
                   -e "s/{{typeLibrary}}/${config.typeLibrary}/g" \
                   -e "s/{{buildSystem}}/${config.buildSystem}/g" \
                   -e "s/{{packageManager}}/${config.packageManager}/g" \
+                  -e "s/{{languageName}}/${config.languageName}/g" \
                   -e "s/{{configFile}}/${config.configFile}/g" \
                   -e "s|{{toolchain}}|${config.toolchain}|g" \
                   -e "s|{{devTools}}|${config.devTools}|g" \
