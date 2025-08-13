@@ -147,7 +147,8 @@
 
             # Create language-specific MCP settings
             cat > .claude/settings.json << 'EOF'
-${mcpServersJson}EOF
+${mcpServersJson}
+EOF
             
             echo "✅ Claude Code configuration complete with ${language}-specific setup!"
             echo "📁 Created:"
