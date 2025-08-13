@@ -321,3 +321,5 @@ NEVER proactively create documentation files (*.md) or README files. Only create
 - Research findings, planning decisions, implementation patterns, and insights MUST be preserved
 - The SPARC orchestrator will enforce memory storage compliance
 - Knowledge not stored represents wasted learning opportunities and repeated mistakes
+
+<!-- CLAUDE.local.md -->
