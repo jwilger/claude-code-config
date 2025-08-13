@@ -23,7 +23,7 @@ In your project's `flake.nix`:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    claude-config.url = "github:your-username/claude-config";
+    claude-config.url = "github:jwilger/claude-code-config";
   };
 
   outputs = { self, nixpkgs, claude-config }:
@@ -51,16 +51,16 @@ For quick setup, use the pre-configured shells:
 
 ```bash
 # Rust project
-nix develop github:your-username/claude-config#rust
+nix develop github:jwilger/claude-code-config#rust
 
 # TypeScript project  
-nix develop github:your-username/claude-config#typescript
+nix develop github:jwilger/claude-code-config#typescript
 
 # Python project
-nix develop github:your-username/claude-config#python  
+nix develop github:jwilger/claude-code-config#python  
 
 # Elixir project
-nix develop github:your-username/claude-config#elixir
+nix develop github:jwilger/claude-code-config#elixir
 ```
 
 These shells automatically set up Claude Code configuration on first run.
@@ -69,7 +69,7 @@ These shells automatically set up Claude Code configuration on first run.
 
 ```bash
 # Start new project with Claude Code integration
-nix flake init --template github:your-username/claude-config#claude
+nix flake init --template github:jwilger/claude-code-config#claude
 ```
 
 ## What Gets Created
@@ -117,7 +117,7 @@ This configuration includes:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    claude-config.url = "github:your-username/claude-config";
+    claude-config.url = "github:jwilger/claude-code-config";
   };
 
   outputs = { self, nixpkgs, claude-config }:
