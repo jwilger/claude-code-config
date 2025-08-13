@@ -1,131 +1,210 @@
-# Main library interface for claude-config
-{ pkgs, system, inputs }:
+# Lightweight Claude Code configuration library
+{ pkgs, system }:
 
 let
-  # Import language-specific modules
-  rustModule = import ./languages/rust.nix { inherit pkgs system inputs; };
-  elixirModule = import ./languages/elixir.nix { inherit pkgs system inputs; };
-  typescriptModule = import ./languages/typescript.nix { inherit pkgs system inputs; };
-  pythonModule = import ./languages/python.nix { inherit pkgs system inputs; };
+  # Import language configuration from config module (breaks circular dependency)
+  configModule = import ./config.nix { inherit pkgs system; };
+  languageConfig = configModule.languageConfig;
+  
+  # Note: We no longer import mcp/core modules here to break circular dependencies
+  # Instead, we inline their import in the shell scripts below
 
-  # Import core modules
-  coreModule = import ./core.nix { inherit pkgs system; };
-  sparcModule = import ./sparc.nix { inherit pkgs system; };
-  mcpModule = import ./mcp.nix { inherit pkgs system; };
+  # Derived pure functions for accessing configuration
+  languagePatterns = builtins.mapAttrs (name: config: config.patterns) languageConfig;
+  defaultTooling = builtins.mapAttrs (name: config: config.tooling) languageConfig;
 
-  # Map language names to their modules
-  languageModules = {
-    rust = rustModule;
-    elixir = elixirModule;
-    typescript = typescriptModule;
-    python = pythonModule;
-  };
+  # FUNCTIONAL CORE: Pure language detection logic
+  # Given a list of detected patterns, determine languages (no I/O)
+  detectLanguagesPure = detectedPatterns: 
+    let
+      checkLanguage = name: config:
+        let
+          hasPattern = pattern: builtins.elem pattern detectedPatterns;
+          hasAnyPattern = builtins.any hasPattern config.patterns;
+        in
+        if hasAnyPattern then name else null;
+      
+      candidates = builtins.attrNames languageConfig;
+      detected = builtins.filter (x: x != null) 
+        (builtins.map (name: checkLanguage name languageConfig.${name}) candidates);
+    in
+    detected;
+
+  # FUNCTIONAL CORE: MCP server listing for a language
+  getMcpServersForLanguage = language:
+    if builtins.hasAttr language languageConfig 
+    then languageConfig.${language}.mcpServers
+    else [];
+
+  # FUNCTIONAL CORE: Generate MCP server descriptions
+  formatMcpServerInfo = language:
+    let
+      servers = getMcpServersForLanguage language;
+      serverDescriptions = {
+        cargo = "cargo (Rust build/test/lint)";
+        mix = "mix (Elixir build/test)";
+        nodejs = "nodejs (Node.js runtime)";
+        git = "git (Version control)";
+        github = "github (PR/issue management)";
+        sparc-memory = "sparc-memory (SPARC workflow memory)";
+      };
+      formatServer = server: "  - ${serverDescriptions.${server} or "unknown-server (${server})"}";
+    in
+    builtins.map formatServer servers;
 
 in
 {
-  # Main function to create a development shell for a specific language
-  mkDevShell = {
-    language,
-    tooling ? {},
-    features ? [],
-    projectName ? "project",
-    ...
-  }:
-    let
-      languageModule = languageModules.${language} or (throw "Unsupported language: ${language}");
-      
-      # Merge user tooling preferences with language defaults
-      finalTooling = languageModule.defaultTooling // tooling;
-      
-      # Get language-specific packages
-      languagePackages = languageModule.getPackages finalTooling;
-      
-      # Get core packages
-      corePackages = coreModule.getCorePackages;
-      
-      # Get feature-specific packages and setup
-      featurePackages = builtins.concatLists (map (feature: 
-        if feature == "sparc-workflow" then sparcModule.getPackages
-        else if feature == "memory-storage" then mcpModule.getPackages  
-        else if feature == "git-safety" then coreModule.getGitSafetyPackages
-        else []
-      ) features);
-      
-      # Generate shell hook
-      shellHook = builtins.concatStringsSep "\n" ([
-        (coreModule.getBaseShellHook projectName language)
-        (languageModule.getShellHook finalTooling)
-      ] ++ (map (feature:
-        if feature == "sparc-workflow" then sparcModule.getShellHook
-        else if feature == "memory-storage" then mcpModule.getShellHook
-        else if feature == "git-safety" then coreModule.getGitSafetyShellHook
-        else ""
-      ) features));
-      
-    in
-    pkgs.mkShell ({
-      buildInputs = languagePackages ++ corePackages ++ featurePackages;
-      inherit shellHook;
-    } // (languageModule.getEnvironment finalTooling));
+  # Expose functional core for use by other modules
+  inherit languageConfig;
 
-  # Generate configuration files for a project
-  generateConfig = {
-    language,
-    tooling ? {},
-    features ? [],
-    projectName ? "project",
-    outputDir ? ".claude",
-    ...
-  }:
-    let
-      languageModule = languageModules.${language} or (throw "Unsupported language: ${language}");
-      finalTooling = languageModule.defaultTooling // tooling;
-      
-      # Generate CLAUDE.md content
-      claudeMdContent = languageModule.generateClaudeMd {
-        inherit projectName finalTooling features;
-      };
-      
-      # Generate settings.json content
-      settingsContent = builtins.toJSON (coreModule.generateSettings {
-        inherit language finalTooling features;
-      });
-      
-      # Generate hooks based on language and features
-      hooks = languageModule.generateHooks finalTooling features;
-      
-    in
-    pkgs.stdenv.mkDerivation {
-      name = "${projectName}-claude-config";
-      unpackPhase = "true";
-      
-      installPhase = ''
-        mkdir -p $out/${outputDir}
-        echo '${claudeMdContent}' > $out/${outputDir}/CLAUDE.md
-        echo '${settingsContent}' > $out/${outputDir}/settings.json
-        
-        # Copy hooks
-        mkdir -p $out/${outputDir}/hooks
-        ${builtins.concatStringsSep "\n" (pkgs.lib.mapAttrsToList (name: content: ''
-          echo '${content}' > $out/${outputDir}/hooks/${name}
-          chmod +x $out/${outputDir}/hooks/${name}
-        '') hooks)}
-      '';
-    };
+  # IMPERATIVE SHELL: Language detection script with I/O
+  detectLanguage = pkgs.writeShellScriptBin "detect-language" ''
+    # I/O function: Check if files/patterns exist in filesystem
+    detect_files() {
+      local patterns=("$@")
+      for pattern in "''${patterns[@]}"; do
+        if [[ "$pattern" == *"*"* ]]; then
+          if ls $pattern 2>/dev/null | grep -q .; then
+            echo "$pattern"
+            return 0
+          fi
+        else
+          if [[ -f "$pattern" ]]; then
+            echo "$pattern"
+            return 0
+          fi
+        fi
+      done
+      return 1
+    }
 
-  # Utility functions
-  utils = {
+    # Collect all detected patterns from filesystem
+    detected_patterns=()
+    ${builtins.concatStringsSep "\n" (
+      builtins.map (lang:
+        let patterns = languageConfig.${lang}.patterns;
+        in builtins.concatStringsSep "\n" (
+          builtins.map (pattern: ''
+            if detect_files "${pattern}" >/dev/null 2>&1; then
+              detected_patterns+=("${pattern}")
+            fi
+          '') patterns
+        )
+      ) (builtins.attrNames languageConfig)
+    )}
+
+    # Use functional core to determine languages
+    # This is a simple case-based implementation of the Nix logic
+    detected_languages=()
+    ${builtins.concatStringsSep "\n" (
+      builtins.map (lang:
+        let 
+          patterns = languageConfig.${lang}.patterns;
+          checkPatterns = builtins.map (p: ''[[ " ''${detected_patterns[*]} " =~ " ${p} " ]]'') patterns;
+        in
+        "if ${builtins.concatStringsSep " || " checkPatterns}; then detected_languages+=(\"${lang}\"); fi"
+      ) (builtins.attrNames languageConfig)
+    )}
+    
+    # Handle results
+    if [[ ''${#detected_languages[@]} -eq 0 ]]; then
+      echo "❌ No supported languages detected"
+      echo "Supported: ${builtins.concatStringsSep ", " (builtins.attrNames languageConfig)}"
+      exit 1
+    elif [[ ''${#detected_languages[@]} -eq 1 ]]; then
+      lang="''${detected_languages[0]}"
+      echo "✅ Detected language: $lang"
+      echo ""
+      echo "🧠 MCP servers for $lang:"
+      ${builtins.concatStringsSep "\n" (
+        builtins.map (lang:
+          let servers = formatMcpServerInfo lang;
+          in ''
+            if [[ "$lang" == "${lang}" ]]; then
+              ${builtins.concatStringsSep "\n      " (builtins.map (s: "echo \"${s}\"") servers)}
+            fi''
+        ) (builtins.attrNames languageConfig)
+      )}
+      echo ""
+      echo "🚀 Run 'claude-config setup $lang' to configure"
+    else
+      echo "⚠️  Multiple languages detected: ''${detected_languages[*]}"
+      echo "Choose one with: claude-config setup <language>"
+    fi
+  '';
+
+  # IMPERATIVE SHELL: Configuration setup script with I/O
+  setupConfig = pkgs.writeShellScriptBin "setup-config" ''
+    if [[ $# -eq 0 ]]; then
+      echo "Usage: setup-config <language> [project-name]"
+      echo "Languages: ${builtins.concatStringsSep ", " (builtins.attrNames languageConfig)}"
+      exit 1
+    fi
+    
+    language="$1"
+    project_name="''${2:-$(basename $(pwd))}"
+    
+    # Validate language using functional core
+    supported_languages="${builtins.concatStringsSep "|" (builtins.attrNames languageConfig)}"
+    if [[ ! "$language" =~ ^($supported_languages)$ ]]; then
+      echo "❌ Unsupported language: $language"
+      echo "Supported: ${builtins.concatStringsSep ", " (builtins.attrNames languageConfig)}"
+      exit 1
+    fi
+    
+    mkdir -p .claude/{agents,commands,hooks,templates}
+    
+    # Generate CLAUDE.md based on language (inline import to break circular dependency)
+    ${(import ./core.nix { inherit pkgs system; }).generateClaudeConfig}/bin/generate-claude-config "$language" "$project_name"
+    
+    # Generate MCP configuration (inline import to break circular dependency)
+    ${(import ./mcp.nix { inherit pkgs system; }).generateMcpSettings}/bin/generate-mcp-settings "$language"
+    
+    # Copy agent definitions
+    cp -r ${../..}/.claude/agents/* .claude/agents/
+    
+    # Copy command definitions  
+    cp -r ${../..}/.claude/commands/* .claude/commands/
+    
+    # Generate language-specific hooks (inline import to break circular dependency)
+    ${(import ./core.nix { inherit pkgs system; }).generateHooks}/bin/generate-hooks "$language"
+    
+    echo "✅ Claude Code configuration setup complete!"
+    echo ""
+    echo "📁 Generated files:"
+    echo "  .claude/CLAUDE.md           # Main configuration"
+    echo "  .claude/settings.json       # MCP server settings"
+    echo "  .claude/agents/            # SPARC workflow agents"
+    echo "  .claude/commands/          # Custom commands"
+    echo "  .claude/hooks/             # Git hooks"
+    echo ""
+    echo "🔧 Next steps:"
+    echo "  1. Review .claude/CLAUDE.md"
+    echo "  2. Install git hooks: git config core.hooksPath .claude/hooks"
+    echo "  3. Open with Claude Code"
+  '';
+
+  # FUNCTIONAL CORE: Utility functions (pure, no I/O)
+  utils = rec {
     # Check if a language is supported
-    isLanguageSupported = language: builtins.hasAttr language languageModules;
+    isLanguageSupported = language: builtins.hasAttr language languageConfig;
     
     # Get available languages
-    availableLanguages = builtins.attrNames languageModules;
+    availableLanguages = builtins.attrNames languageConfig;
+    
+    # Get complete language configuration
+    getLanguageConfig = language: 
+      if builtins.hasAttr language languageConfig 
+      then languageConfig.${language}
+      else throw "Unsupported language: ${language}";
     
     # Get default tooling for a language
-    getDefaultTooling = language: 
-      let
-        languageModule = languageModules.${language} or (throw "Unsupported language: ${language}");
-      in
-      languageModule.defaultTooling;
+    getDefaultTooling = language: (getLanguageConfig language).tooling;
+    
+    # Get MCP servers for a language
+    getMcpServers = language: (getLanguageConfig language).mcpServers;
+    
+    # Get file patterns for a language
+    getPatterns = language: (getLanguageConfig language).patterns;
   };
 }
