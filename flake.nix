@@ -173,16 +173,6 @@ mod tests {
               cp -r claude-templates/agents/* .claude/agents/
               
               # Generate CLAUDE.md from template with substitutions
-              # First escape newlines in content blocks
-              export LANG_DEP_CONTENT=$(echo "${config.languageDependencyContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
-              export LANG_TYPE_CONTENT=$(echo "${config.languageTypeSystemContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
-              export LANG_QUALITY_CONTENT=$(echo "${config.languageQualityEnforcementContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
-              export LANG_TESTING_CONTENT=$(echo "${config.languageTestingContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
-              export LANG_DEV_CONTENT=$(echo "${config.languageDevelopmentConventionsContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
-              export LANG_GATES_CONTENT=$(echo "${config.languageQualityGatesContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
-              export LANG_PROP_CONTENT=$(echo "${config.languagePropertyTestingContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
-              export LANG_CRIT_CONTENT=$(echo "${config.languageCriticalRulesContent}" | sed ':a;N;$!ba;s/\n/\\n/g')
-              
               sed -e "s/{{testRunner}}/${config.testRunner}/g" \
                   -e "s/{{testCommandFallback}}/${config.testCommandFallback}/g" \
                   -e "s/{{testBacktraceEnv}}/${config.testBacktraceEnv}/g" \
@@ -204,15 +194,19 @@ mod tests {
                   -e "s/{{testMcpCommand}}/${config.testMcpCommand}/g" \
                   -e "s/{{lintMcpCommand}}/${config.lintMcpCommand}/g" \
                   -e "s/{{formatCheckMcpCommand}}/${config.formatCheckMcpCommand}/g" \
-                  -e "s|{{languageDependencyContent}}|$LANG_DEP_CONTENT|g" \
-                  -e "s|{{languageTypeSystemContent}}|$LANG_TYPE_CONTENT|g" \
-                  -e "s|{{languageQualityEnforcementContent}}|$LANG_QUALITY_CONTENT|g" \
-                  -e "s|{{languageTestingContent}}|$LANG_TESTING_CONTENT|g" \
-                  -e "s|{{languageDevelopmentConventionsContent}}|$LANG_DEV_CONTENT|g" \
-                  -e "s|{{languageQualityGatesContent}}|$LANG_GATES_CONTENT|g" \
-                  -e "s|{{languagePropertyTestingContent}}|$LANG_PROP_CONTENT|g" \
-                  -e "s|{{languageCriticalRulesContent}}|$LANG_CRIT_CONTENT|g" \
-                  CLAUDE.md.template | sed 's/\\n/\n/g' > CLAUDE.base.md
+                  CLAUDE.md.template > CLAUDE.md
+              
+              # Substitute language-specific content blocks inline
+              ${pkgs.gnused}/bin/sed -i \
+                -e "/{{languageDependencyContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languageDependencyContent}" \
+                -e "/{{languageTypeSystemContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languageTypeSystemContent}" \
+                -e "/{{languageQualityEnforcementContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languageQualityEnforcementContent}" \
+                -e "/{{languageTestingContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languageTestingContent}" \
+                -e "/{{languageDevelopmentConventionsContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languageDevelopmentConventionsContent}" \
+                -e "/{{languageQualityGatesContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languageQualityGatesContent}" \
+                -e "/{{languagePropertyTestingContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languagePropertyTestingContent}" \
+                -e "/{{languageCriticalRulesContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languageCriticalRulesContent}" \
+                CLAUDE.md
 
               # Create language-specific MCP settings
               cat > .claude/settings.json << 'EOF'
@@ -222,39 +216,38 @@ EOF
             
             installPhase = ''
               mkdir -p $out
-              cp CLAUDE.base.md $out/
+              cp CLAUDE.md $out/
               cp -r .claude $out/
             '';
           };
           
-        # Setup function that handles include system
+        # Simple setup that creates symlinks
         setupClaudeConfig = language:
           let
             baseConfig = buildClaudeConfig language;
           in pkgs.writeShellScript "setup-claude-${language}" ''
             echo "Setting up Claude Code configuration for ${language}..."
             
-            # Copy .claude directory from nix store (always update to latest)
-            rm -rf .claude
-            cp -r ${baseConfig}/.claude ./
-            chmod -R u+w .claude
+            # Create individual symlinks to allow project-specific additions
+            ln -sf ${baseConfig}/CLAUDE.md ./CLAUDE.md
             
-            # Handle CLAUDE.md with include system
-            if [ -f "CLAUDE.local.md" ]; then
-              # Replace include marker with local content
-              sed '/<!-- CLAUDE.local.md -->/r CLAUDE.local.md' ${baseConfig}/CLAUDE.base.md | \
-                sed '/<!-- CLAUDE.local.md -->/d' > CLAUDE.md
-              echo "✅ Generated CLAUDE.md with local customizations"
-            else
-              # Just remove the include marker
-              sed '/<!-- CLAUDE.local.md -->/d' ${baseConfig}/CLAUDE.base.md > CLAUDE.md
-              echo "✅ Generated CLAUDE.md (create CLAUDE.local.md for customizations)"
-            fi
+            # Create .claude directory structure with selective symlinking
+            mkdir -p .claude
+            ln -sf ${baseConfig}/.claude/settings.json .claude/settings.json
+            ln -sf ${baseConfig}/.claude/agents .claude/agents
+            ln -sf ${baseConfig}/.claude/commands .claude/commands
+            ln -sf ${baseConfig}/.claude/hooks .claude/hooks
             
-            echo "📁 Claude Code configuration ready:"
-            echo "  CLAUDE.md (generated, do not edit directly)"
-            echo "  CLAUDE.local.md (create this for project-specific content)"
-            echo "  .claude/ (${builtins.toString (builtins.length (languageConfigs.${language}).mcpServers)} MCP servers, SPARC workflow)"
+            echo "✅ Claude Code configuration symlinked!"
+            echo "📁 Configuration structure:"
+            echo "  CLAUDE.md -> nix store (language-specific, updates with flake)"
+            echo "  CLAUDE.local.md (create this for project-specific content - loaded via @CLAUDE.local.md)"
+            echo "  .claude/agents/ -> nix store (SPARC workflow)"
+            echo "  .claude/commands/ -> nix store (custom commands)"
+            echo "  .claude/hooks/ -> nix store (quality enforcement)"
+            echo "  .claude/settings.json -> nix store (${builtins.toString (builtins.length (languageConfigs.${language}).mcpServers)} MCP servers)"
+            echo ""
+            echo "You can add project-specific files directly to .claude/ - they won't be overwritten."
           '';
         
       in {
