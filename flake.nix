@@ -265,23 +265,37 @@ EOF
             # Create individual symlinks to allow project-specific additions
             ln -sf ${baseConfig}/CLAUDE.md ./CLAUDE.md
             
-            # Create .claude directory structure with selective symlinking
-            mkdir -p .claude
+            # Create .claude directory structure with individual file symlinks
+            mkdir -p .claude/{agents,commands,hooks}
+            
+            # Symlink individual files from each directory
             ln -sf ${baseConfig}/.claude/settings.json .claude/settings.json
-            ln -sf ${baseConfig}/.claude/agents .claude/agents
-            ln -sf ${baseConfig}/.claude/commands .claude/commands
-            ln -sf ${baseConfig}/.claude/hooks .claude/hooks
+            
+            # Symlink each agent file individually
+            for agent_file in ${baseConfig}/.claude/agents/*; do
+              [ -f "$agent_file" ] && ln -sf "$agent_file" ".claude/agents/$(basename "$agent_file")"
+            done
+            
+            # Symlink each command file individually  
+            for command_file in ${baseConfig}/.claude/commands/*; do
+              [ -f "$command_file" ] && ln -sf "$command_file" ".claude/commands/$(basename "$command_file")"
+            done
+            
+            # Symlink each hook file individually
+            for hook_file in ${baseConfig}/.claude/hooks/*; do
+              [ -f "$hook_file" ] && ln -sf "$hook_file" ".claude/hooks/$(basename "$hook_file")"
+            done
             
             echo "✅ Claude Code configuration symlinked!"
             echo "📁 Configuration structure:"
             echo "  CLAUDE.md -> nix store (language-specific, updates with flake)"
             echo "  CLAUDE.local.md (create this for project-specific content - loaded via @CLAUDE.local.md)"
-            echo "  .claude/agents/ -> nix store (SPARC workflow)"
-            echo "  .claude/commands/ -> nix store (custom commands)"
-            echo "  .claude/hooks/ -> nix store (quality enforcement)"
+            echo "  .claude/agents/[files] -> nix store (individual SPARC agent files)"
+            echo "  .claude/commands/[files] -> nix store (individual command files)"
+            echo "  .claude/hooks/[files] -> nix store (individual hook files)"
             echo "  .claude/settings.json -> nix store (${builtins.toString (builtins.length (languageConfigs.${language}).mcpServers)} MCP servers)"
             echo ""
-            echo "You can add project-specific files directly to .claude/ - they won't be overwritten."
+            echo "You can add project-specific files directly to .claude/ subdirectories - they won't be overwritten."
           '';
         
       in {
