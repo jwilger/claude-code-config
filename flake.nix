@@ -196,16 +196,50 @@ mod tests {
                   -e "s/{{formatCheckMcpCommand}}/${config.formatCheckMcpCommand}/g" \
                   CLAUDE.md.template > CLAUDE.md
               
-              # Substitute language-specific content blocks inline
-              ${pkgs.gnused}/bin/sed -i \
-                -e "/{{languageDependencyContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languageDependencyContent}" \
-                -e "/{{languageTypeSystemContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languageTypeSystemContent}" \
-                -e "/{{languageQualityEnforcementContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languageQualityEnforcementContent}" \
-                -e "/{{languageTestingContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languageTestingContent}" \
-                -e "/{{languageDevelopmentConventionsContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languageDevelopmentConventionsContent}" \
-                -e "/{{languageQualityGatesContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languageQualityGatesContent}" \
-                -e "/{{languagePropertyTestingContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languagePropertyTestingContent}" \
-                -e "/{{languageCriticalRulesContent}}/c\\${builtins.replaceStrings ["\n"] ["\\n"] config.languageCriticalRulesContent}" \
+              # Create temporary files for each content block to avoid shell escaping issues
+              cat > lang_dep_content << 'EOF'
+${config.languageDependencyContent}
+EOF
+              cat > lang_type_content << 'EOF'  
+${config.languageTypeSystemContent}
+EOF
+              cat > lang_quality_content << 'EOF'
+${config.languageQualityEnforcementContent}
+EOF
+              cat > lang_testing_content << 'EOF'
+${config.languageTestingContent}
+EOF
+              cat > lang_dev_content << 'EOF'
+${config.languageDevelopmentConventionsContent}
+EOF
+              cat > lang_gates_content << 'EOF'
+${config.languageQualityGatesContent}
+EOF
+              cat > lang_prop_content << 'EOF'
+${config.languagePropertyTestingContent}
+EOF
+              cat > lang_crit_content << 'EOF'
+${config.languageCriticalRulesContent}
+EOF
+              
+              # Replace template variables with file contents
+              sed -i \
+                -e "/{{languageDependencyContent}}/r lang_dep_content" \
+                -e "/{{languageDependencyContent}}/d" \
+                -e "/{{languageTypeSystemContent}}/r lang_type_content" \
+                -e "/{{languageTypeSystemContent}}/d" \
+                -e "/{{languageQualityEnforcementContent}}/r lang_quality_content" \
+                -e "/{{languageQualityEnforcementContent}}/d" \
+                -e "/{{languageTestingContent}}/r lang_testing_content" \
+                -e "/{{languageTestingContent}}/d" \
+                -e "/{{languageDevelopmentConventionsContent}}/r lang_dev_content" \
+                -e "/{{languageDevelopmentConventionsContent}}/d" \
+                -e "/{{languageQualityGatesContent}}/r lang_gates_content" \
+                -e "/{{languageQualityGatesContent}}/d" \
+                -e "/{{languagePropertyTestingContent}}/r lang_prop_content" \
+                -e "/{{languagePropertyTestingContent}}/d" \
+                -e "/{{languageCriticalRulesContent}}/r lang_crit_content" \
+                -e "/{{languageCriticalRulesContent}}/d" \
                 CLAUDE.md
 
               # Create language-specific MCP settings
